@@ -246,17 +246,17 @@ func (b *Bin2es) Pipeline(row map[string]interface{}) error {
 		case "insert":
 			for _, row := range All {
 				request := es7.NewBulkIndexRequest().Index(conf.Dest.Index).Id(row["id"].(string)).Doc(row)
-				b.esCli.BulkService.Add(request)
+				b.esCli.BulkService.Add(request).Refresh("true")
 			}
 		case "update":
 			for _, row := range All {
 				request := es7.NewBulkUpdateRequest().Index(conf.Dest.Index).Id(row["id"].(string)).Doc(row).DocAsUpsert(true)
-				b.esCli.BulkService.Add(request)
+				b.esCli.BulkService.Add(request).Refresh("true")
 			}
 		case "delete":
 			for _, row := range All {
 				request := es7.NewBulkDeleteRequest().Index(conf.Dest.Index).Id(row["id"].(string))
-				b.esCli.BulkService.Add(request)
+				b.esCli.BulkService.Add(request).Refresh("true")
 			}
 		}
 	}
