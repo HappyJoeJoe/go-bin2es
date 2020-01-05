@@ -1,0 +1,48 @@
+[
+    {
+        "schema":"my_db",
+        "tables": [
+            "test_tbl",
+            "test_tbl2"
+        ],
+        "actions":["insert", "update", "delete"],
+        "pipeline":{
+            "PkDoSQL":{
+                "sql":"SELECT test_tbl.id, test_tbl.age, test_tbl.name, group_concat(concat_ws('_', test_tbl2.id, test_tbl2.age) separator ',') as obj_arr FROM test_tbl join test_tbl2 on test_tbl.id = test_tbl2.tbl1_id WHERE (?) GROUP BY test_tbl.id"
+            },
+            "NestedObj":{
+                "common":"obj",
+                "fields":[
+                    {"age":"age"},
+                    {"name":"name"}
+                ]
+            },
+            "NestedArray":{
+                "sql_field":"obj_arr",
+                "common":"obj_arr",
+                "pos2fields":[
+                    {"id":1},
+                    {"age":2}
+                ]
+            }
+        },
+        "dest":{
+            "index":"test_es"
+        }
+    },
+    {
+        "schema":"my_db",
+        "tables": [
+            "test_tbl2"
+        ],
+        "actions":["insert", "update", "delete"],
+        "pipeline":{
+            "PkDoSQL":{
+                "sql":"SELECT id, age, name WHERE (?)"
+            }
+        },
+        "dest":{
+            "index":"test_es2"
+        }
+    }
+]
