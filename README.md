@@ -24,18 +24,14 @@ server_id = 1
 
 
 [[source]]
-schema = "dos_test"
+schema = "my_db"
 tables = [
-	"jzg_car_models",
-	"auction_cars",
-	"auction_car_infos",
-	"auction_car_details"
+	"test_tbl"
 ]
 [[source]]
-schema = "dos_test"
+schema = "my_db"
 tables = [
-	"used_car_tickets",
-	"jzg_car_models"
+	"test_tbl2"
 ]
 
 ```
