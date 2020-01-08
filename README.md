@@ -179,4 +179,4 @@ tables = [
 ```
 
 ### 如果你觉得对你有用, 可以给我打赏一瓶Colo
-![avatar](https://github.com/HappyJoeJoe/go-bin2es/blob/master/9db0fe58b386110503eb2a08703752bc.jpg)
+[![](https://github.com/HappyJoeJoe/go-bin2es/blob/master/9db0fe58b386110503eb2a08703752bc.jpg)]
