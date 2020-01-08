@@ -151,7 +151,8 @@ tables = [
                     ],
                     "id": "1",
                     "profile": { #嵌套对象
-                        "es_name": "m"
+                        "es_name": "Tom",
+                        "es_sex": "m"
                     }
                 }
             },
@@ -169,7 +170,8 @@ tables = [
                     ],
                     "id": "2",
                     "profile": { #嵌套对象
-                        "es_name": "m"
+                        "es_name": "Jerry",
+                        "es_sex": "m"
                     }
                 }
             }
