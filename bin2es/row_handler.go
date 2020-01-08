@@ -155,3 +155,11 @@ func (r reflectFunc) NestedArray(row map[string]interface{}, SQLField string, Co
 
 	return rows, nil
 }
+
+/* function: 用户自定义函数
+ * row:  参数row必传, 表示每一个handler处理过的行数据
+ * ROWS: 表示经过的行数据, 可以是多行, 比如: 经`PkDoSQL`处理过后变成了一行或多行数据
+ */
+func (r reflectFunc) UserDefinedFunc(row map[string]interface{}, Args ...interface{}) (ROWS, error) {
+	return nil, nil
+}
