@@ -2,10 +2,10 @@ data_dir = "./var"
 
 [es]
 nodes = [
-	"http://127.0.0.1:9200"
+	"http://127.0.0.1:9200" #es集群
 ]
-bulk_size = 1024
-flush_duration = 500
+bulk_size = 1024  #批量刷新个数
+flush_duration = 500  #批量刷新时间间隔, 单位:ms
 
 
 [mysql]
@@ -13,16 +13,12 @@ addr = "127.0.0.1:3306"
 user = "root"
 pwd = "root"
 charset = "utf8"
-server_id = 1
+server_id = 2 #与其他slave节点的server_id不同即可
 
 
 [[source]]
-schema = "my_db"
+schema = "my_test"  #过滤my_test下的`Parent`和`Child`表, 可以配置多个
 tables = [
-	"test_tbl"
-]
-[[source]]
-schema = "my_db"
-tables = [
-	"test_tbl2"
+	"Parent",
+	"Child"
 ]

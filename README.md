@@ -9,9 +9,45 @@ go-bin2es is a service syncing binlog to es
 + 原生支持es的嵌套对象、嵌套数组类型
 + 实时性高, 低时延
 
+
+# Example
+```sql
+
+create database my_test;
+
+create table Parent (
+	id int not null auto_increment primary key,
+	name varchar(64) not null,
+	sex char(1) not null
+)comment = '父';
+
+create table Child (
+	id int not null auto_increment primary key,
+	name varchar(64) not null,
+	sex char(1) not null, 
+	parent_id int not null
+)comment = '子';
+
+Parent:
+insert into Parent (name, sex) values ('Tom', "m"); #id为1
+Child:
+insert into Child (name, sex, parent_id) values ('Tom1', 'm', 1); #Tom的孩子1
+insert into Child (name, sex, parent_id) values ('Tom2', 'm', 1); #Tom的孩子2
+insert into Child (name, sex, parent_id) values ('Tom3', 'm', 1); #Tom的孩子3
+
+Parent:
+insert into Parent (name, sex) values ('Jerry', "m"); #id为2
+Child:
+insert into Child (name, sex, parent_id) values ('Jerry1', 'm', 2); #Jerry的孩子1
+insert into Child (name, sex, parent_id) values ('Jerry2', 'f', 2); #Jerry的孩子2
+```
+
+
+
 ### editing your config.toml, and configure it like following:
 
-```
+```toml
+
 data_dir = "./var"
 
 [es]
@@ -31,15 +67,116 @@ server_id = 1
 
 
 [[source]]
-schema = "my_db"  #过滤my_db下的test_tbl表, 可以配置多个
+schema = "my_test"  #过滤my_test下的`Parent`和`Child`表, 可以配置多个
 tables = [
-	"test_tbl",
-	"test_tbl2"
-]
-[[source]]
-schema = "my_db"
-tables = [
-	"test_tbl2"
+	"Parent",
+	"Child"
 ]
 
 ```
+
+### editing bin2es.json
+
+```json
+
+[
+    {
+        "schema":"my_test",
+        "tables": [
+            "Parent",
+            "Child"
+        ],
+        "actions":["insert", "update", "delete"],
+        "pipeline":{
+            "PkDoSQL":{
+                "sql":"SELECT Parent.id, Parent.name, Parent.sex, group_concat(concat_ws('_', Child.name, Child.sex) separator ',') as Childs FROM Parent join Child on Parent.id = Child.parent_id WHERE (?) GROUP BY Parent.id"
+            },
+            "NestedObj":{
+                "common":"profile", 
+                "fields":[
+                    {"name":"es_name"}, 将查询到的结果的`name`字段放进`profile`的`es_name`下
+                    {"sex":"es_sex"}    同理
+                ]
+            },
+            "NestedArray":{
+                "sql_field":"Childs",   将查询到的结果的`Childs`字段解析放入到common指定的`childs`下
+                "common":"childs",
+                "pos2fields":[          其中解析结果的第一个位置放入到es的`es_name`下, 第二个位置放入到`es_sex`下
+                    {"es_name":1},
+                    {"es_sex":2}
+                ]
+            }
+        },
+        "dest":{
+            "index":"test_es"           es的索引名
+        }
+    }
+]
+
+```
+
+### execute ./bin/go-bin2es
++ then, you will get results in es by using following API: `GET /test_es/_search`
+
+```json
+
+{
+    "took": 1,
+    "timed_out": false,
+    "_shards": {
+        "total": 1,
+        "successful": 1,
+        "skipped": 0,
+        "failed": 0
+    },
+    "hits": {
+        "total": {
+            "value": 2,
+            "relation": "eq"
+        },
+        "max_score": 1.0,
+        "hits": [
+            {
+                "_index": "test_es",
+                "_type": "_doc",
+                "_id": "1",
+                "_score": 1.0,
+                "_source": {
+                    "childs": [  #嵌套数组
+                        {
+                            "es_name": "Tom3",
+                            "es_sex": "m"
+                        }
+                    ],
+                    "id": "1",
+                    "profile": { #嵌套对象
+                        "es_name": "m"
+                    }
+                }
+            },
+            {
+                "_index": "test_es",
+                "_type": "_doc",
+                "_id": "2",
+                "_score": 1.0,
+                "_source": {
+                    "childs": [  #嵌套数组
+                        {
+                            "es_name": "Jerry2",
+                            "es_sex": "f"
+                        }
+                    ],
+                    "id": "2",
+                    "profile": { #嵌套对象
+                        "es_name": "m"
+                    }
+                }
+            }
+        ]
+    }
+}
+
+```
+
+### 如果你觉得对你有用, 可以给我打赏一瓶Colo
+![avatar](9db0fe58b386110503eb2a08703752bc.jpg)
