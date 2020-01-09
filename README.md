@@ -2,7 +2,7 @@
 
 go-bin2es is a service syncing binlog to es
 
-采用了[go-mysql库](https://github.com/siddontang/go-mysql)可以过滤指定的db的table, 从而把binlog数据通过[配置的方法](./config/binlog2es.json)过滤后, 刷新到`elasticsearch7`上
+采用了[go-mysql](https://github.com/siddontang/go-mysql)可以过滤指定的db的table, 从而把binlog数据通过[配置的方法](./config/binlog2es.json)过滤后, 刷新到`elasticsearch7`上
 
 ## 优点:
 + 支持高版本的elasticsearch7
