@@ -52,8 +52,9 @@ func NewConfig(data string) (*Config, error) {
 	return &c, nil
 }
 
-type Pos2Fields []map[string]int
-type Fields     []map[string]string
+type Pos2Field  map[string]int
+type Field      map[string]string
+type Replace    map[string]string
 type ROWS       []map[string]interface{}
 
 type Bin2esConfig []struct {
@@ -64,16 +65,17 @@ type Bin2esConfig []struct {
 	Dest     Dest     `json:"dest"`
 }
 type PkDoSQL struct {
-	SQL     string `json:"sql"`
+	SQL     	string 		`json:"sql"`
+	Replaces 	[]Replace 	`json:"replaces"`
 }
 type NestedObj struct {
-	Common string   `json:"common"`
-	Fields Fields   `json:"fields"`
+	Common 		string   	`json:"common"`
+	Fields 		[]Field   	`json:"fields"`
 }
 type NestedArray struct {
-	SQLField   string       `json:"sql_field"`
-	Common     string       `json:"common"`
-	Pos2Fields Pos2Fields   `json:"pos2fields"`
+	SQLField   	string       `json:"sql_field"`
+	Common     	string       `json:"common"`
+	Pos2Fields 	[]Pos2Field  `json:"pos2fields"`
 }
 type Pipeline struct {
 	PkDoSQL     PkDoSQL     `json:"PkDoSQL"`

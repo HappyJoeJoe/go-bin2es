@@ -62,30 +62,31 @@ func (h *eventHandler) OnXID(nextPos mysql.Position) error {
 func (h *eventHandler) OnRow(e *canal.RowsEvent) error {
 	schema  := e.Table.Schema
 	table   := e.Table.Name
+	columns := e.Table.Columns
 	action  := e.Action
-	message := make(map[string]string)
+	message := make(map[string]interface{})
 
 	if (h.b.isInTblFilter(schema+"."+table) != true) {
 		return h.b.ctx.Err()
 	}
 
 	var data []byte
-	var value []interface{}
+	var err error
+	var values []interface{}
 	if action == "insert" || action == "delete" {
-		value = e.Rows[0]
+		values = e.Rows[0]
 	} else if (action == "update"){
-		value = e.Rows[1]
+		values = e.Rows[1]
 	}
 
+	body := make(map[string]string)
+	for i := 0; i < len(columns); i++ {
+		body[columns[i].Name] = toString(values[i])
+	}
 	message["schema"] = schema
 	message["table"]  = table
 	message["action"] = action
-	id, err := e.Table.GetColumnValue("id", value)
-	if err != nil {
-		return errors.Trace(err)
-	}
-
-	message["id"] = strconv.FormatUint(toUint64(id), 10)
+	message["body"]   = body
 
 	data, err = json.Marshal(message)
 	if err != nil {
@@ -264,29 +265,37 @@ func (b *Bin2es) Pipeline(row map[string]interface{}) error {
 	return nil
 }
 
-func toUint64(i interface{}) uint64 {
+func toString(i interface{}) string {
 	switch i := i.(type) {
 	case int:
-		return uint64(i)
+		return strconv.FormatInt(int64(i), 10)
 	case int8:
-		return uint64(i)
+		return strconv.FormatInt(int64(i), 10)
 	case int16:
-		return uint64(i)
+		return strconv.FormatInt(int64(i), 10)
 	case int32:
-		return uint64(i)
+		return strconv.FormatInt(int64(i), 10)
 	case int64:
-		return uint64(i)
+		return strconv.FormatInt(i, 10)
 	case uint:
-		return uint64(i)
+		return strconv.FormatUint(uint64(i), 10)
 	case uint8:
-		return uint64(i)
+		return strconv.FormatUint(uint64(i), 10)
 	case uint16:
-		return uint64(i)
+		return strconv.FormatUint(uint64(i), 10)
 	case uint32:
-		return uint64(i)
+		return strconv.FormatUint(uint64(i), 10)
 	case uint64:
-		return uint64(i)
+		return strconv.FormatUint(i, 10)
+	case float32:
+		return strconv.FormatFloat(float64(i), 'f', -1, 64)
+	case float64:
+		return strconv.FormatFloat(i, 'f', -1, 64)
+	case bool:
+		return strconv.FormatBool(i)
+	case string:
+		return i
 	}
 
-	return 0
+	return ""
 }

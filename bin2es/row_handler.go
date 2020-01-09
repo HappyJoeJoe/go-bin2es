@@ -11,11 +11,10 @@ type reflectFunc struct {
 }
 
 /* fuction: 执行sql, 并将`SQL`的`?`自动替换为感兴趣表的主键id
- * eg: 若遇到了`jzg_car_models`表, 则自动将`?`替换为
- *     jzg_car_models.id = xxx
+ * eg: 若遇到了`Parent`表, 则自动将`?`替换为
+ *     Parent.id = xx
  */
-func (r reflectFunc) PkDoSQL(row map[string]interface{}, SQL string) (ROWS, error) {
-	
+func (r reflectFunc) PkDoSQL(row map[string]interface{}, SQL string, replaces []Replace) (ROWS, error) {
 	rows := make(ROWS, 0)
 
 	if SQL == "" {
@@ -25,11 +24,20 @@ func (r reflectFunc) PkDoSQL(row map[string]interface{}, SQL string) (ROWS, erro
 
 	schema 	:= row["schema"].(string)
 	table  	:= row["table"].(string)
-	id     	:= row["id"].(string)
-	replace := strings.Join([]string{table, "id"}, ".")
-	replace  = strings.Join([]string{replace, id}, "=")
+	body  	:= row["body"].(map[string]interface{})
 
-	SQL = strings.Replace(SQL, "?", replace, -1)
+	mapping := make(map[string]string)
+	var replaceStr string
+	for _, replace := range replaces {
+		for tblStr, fieldStr := range replace {
+			mapping[tblStr] = fieldStr
+		}
+	}
+
+	replaceStr = strings.Join([]string{table, mapping[table]}, ".")
+	replaceStr = strings.Join([]string{replaceStr, body[mapping[table]].(string)}, " = ")
+
+	SQL = strings.Replace(SQL, "?", replaceStr, -1)
 
 	db := r.b.sqlPool[schema]
 	db_rows, err := db.Query(SQL)
@@ -71,7 +79,7 @@ func (r reflectFunc) PkDoSQL(row map[string]interface{}, SQL string) (ROWS, erro
 	if err = db_rows.Err(); err != nil {
 		return nil, err
 	}
-	
+
 	return rows, nil
 }
 
@@ -79,7 +87,7 @@ func (r reflectFunc) PkDoSQL(row map[string]interface{}, SQL string) (ROWS, erro
  * Common 表示最终映射到es上的object名字
  * fields 表示sql映射到es上的键值对
  */
-func (r reflectFunc) NestedObj(row map[string]interface{}, Common string, fields Fields) (ROWS, error) {
+func (r reflectFunc) NestedObj(row map[string]interface{}, Common string, fields []Field) (ROWS, error) {
 	
 	rows := make(ROWS, 0)
 
@@ -101,7 +109,7 @@ func (r reflectFunc) NestedObj(row map[string]interface{}, Common string, fields
 
 	row[Common] = common
 	rows = append(rows, row)
-	
+
 	return rows, nil
 }
 
@@ -115,7 +123,7 @@ func (r reflectFunc) NestedObj(row map[string]interface{}, Common string, fields
  *     被解析为: [[68, 3], [94, 3], [94, 3]]
  *     其中`68`对应的位置是`1`, 而`3`对应的位置是`2`
  */
-func (r reflectFunc) NestedArray(row map[string]interface{}, SQLField string, Common string, pos2Fields Pos2Fields) (ROWS, error) {
+func (r reflectFunc) NestedArray(row map[string]interface{}, SQLField string, Common string, pos2Fields []Pos2Field) (ROWS, error) {
 
 	rows := make(ROWS, 0)
 	//参数校验
@@ -158,7 +166,7 @@ func (r reflectFunc) NestedArray(row map[string]interface{}, SQLField string, Co
 
 /* function: 用户自定义函数
  * row:  参数row必传, 表示每一个handler处理过的行数据
- * ROWS: 表示经过的行数据, 可以是多行, 比如: 经`PkDoSQL`处理过后变成了一行或多行数据
+ * ROWS: 表示经处理过的行数据, 可以是多行, 比如: 经`PkDoSQL`处理过后变成了一行或多行数据
  */
 func (r reflectFunc) UserDefinedFunc(row map[string]interface{}, Args ...interface{}) (ROWS, error) {
 	return nil, nil
