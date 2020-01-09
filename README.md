@@ -90,7 +90,11 @@ tables = [
         "actions":["insert", "update", "delete"],
         "pipeline":{
             "PkDoSQL":{
-                "sql":"SELECT Parent.id, Parent.name, Parent.sex, group_concat(concat_ws('_', Child.name, Child.sex) separator ',') as Childs FROM Parent join Child on Parent.id = Child.parent_id WHERE (?) GROUP BY Parent.id"
+                "sql":"SELECT Parent.id, Parent.name, Parent.sex, group_concat(concat_ws('_', Child.name, Child.sex) separator ',') as Childs FROM Parent join Child on Parent.id = Child.parent_id WHERE (?) GROUP BY Parent.id",
+                "replaces": [ #若遇到Parent或Child, 自动将`?`替换为`$key.$value = {该表对应的$value对应的字段的值}`
+                    {"Parent":"id"},  #eg: 若遇到Parent, 则`?`被替换为`Parent.id = 行数据对应的`id`字段的值`
+                    {"Child":"parent_id"} #eg: Child, 则`?`被替换为`Child.parent_id = 行数据对应的`parent_id`字段的值`
+                ]
             },
             "NestedObj":{
                 "common":"profile", 
@@ -122,7 +126,7 @@ tables = [
 ```json
 
 {
-    "took": 1,
+    "took": 0,
     "timed_out": false,
     "_shards": {
         "total": 1,
@@ -145,8 +149,16 @@ tables = [
                 "_source": {
                     "childs": [  #嵌套数组
                         {
-                            "es_name": "Tom3",
-                            "es_sex": "m"
+                            "chl_name": "Tom1",
+                            "chl_sex": "f"
+                        },
+                        {
+                            "chl_name": "Tom2",
+                            "chl_sex": "f"
+                        },
+                        {
+                            "chl_name": "Tom3",
+                            "chl_sex": "m"
                         }
                     ],
                     "id": "1",
@@ -164,8 +176,12 @@ tables = [
                 "_source": {
                     "childs": [  #嵌套数组
                         {
-                            "es_name": "Jerry2",
-                            "es_sex": "f"
+                            "chl_name": "Jerry1",
+                            "chl_sex": "m"
+                        },
+                        {
+                            "chl_name": "Jerry2",
+                            "chl_sex": "f"
                         }
                     ],
                     "id": "2",
