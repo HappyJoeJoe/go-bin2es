@@ -58,8 +58,6 @@ func NewBin2es(c *Config) (*Bin2es, error) {
 		return nil, errors.Trace(err)
 	}
 
-	log.Infof("%+v", b.bin2esConf)
-
 	if err = b.newCanal(); err != nil {
 		return nil, errors.Trace(err)
 	}
