@@ -6,30 +6,38 @@
             "Child"
         ],
         "actions":["insert", "update", "delete"],
-        "pipeline":{
-            "PkDoSQL":{
-                "sql":"SELECT Parent.id, Parent.name, Parent.sex, GROUP_CONCAT(CONCAT_WS('_', Child.name, Child.sex) SEPARATOR ',') AS Childs FROM Parent INNER JOIN Child ON Parent.id = Child.parent_id WHERE (?) GROUP BY Parent.id",
-                "replaces": [
-                    {"Parent":"id"},
-                    {"Child":"parent_id"}
-                ]
+        "pipelines": [
+            {
+                "PkDoSQL":{
+                    "sql":"SELECT Parent.id, Parent.name, Parent.sex, GROUP_CONCAT(CONCAT_WS('_', Child.name, Child.sex) SEPARATOR ',') AS Childs FROM Parent INNER JOIN Child ON Parent.id = Child.parent_id WHERE (?) GROUP BY Parent.id",
+                    "replaces": [
+                        {"Parent":"id"},
+                        {"Child":"parent_id"}
+                    ]
+                }
             },
-            "NestedObj":{
-                "common":"profile",
-                "fields":[
-                    {"name":"es_name"},
-                    {"sex":"es_sex"}
-                ]
+            {
+                "NestedObj":{
+                    "common":"profile",
+                    "fields":[
+                        {"name":"es_name"},
+                        {"sex":"es_sex"}
+                    ]
+                }
             },
-            "NestedArray":{
-                "sql_field":"Childs",
-                "common":"childs",
-                "pos2fields":[
-                    {"chl_name":1},
-                    {"chl_sex":2}
-                ]
+            {
+                "NestedArray":{
+                    "sql_field":"Childs",
+                    "common":"childs",
+                    "pos2fields":[
+                        {"chl_name":1},
+                        {"chl_sex":2}
+                    ],
+                    "fields_seprator": "_",
+                    "group_seprator": ","
+                }
             }
-        },
+        ],
         "dest":{
             "index":"test_es"
         }

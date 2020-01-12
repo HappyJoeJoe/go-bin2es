@@ -70,8 +70,6 @@ func (h *eventHandler) OnRow(e *canal.RowsEvent) error {
 		return h.b.ctx.Err()
 	}
 
-	var data []byte
-	var err error
 	var values []interface{}
 	if action == "insert" || action == "delete" {
 		values = e.Rows[0]
@@ -88,7 +86,7 @@ func (h *eventHandler) OnRow(e *canal.RowsEvent) error {
 	message["action"] = action
 	message["body"]   = body
 
-	data, err = json.Marshal(message)
+	data, err := json.Marshal(message)
 	if err != nil {
 		return errors.Trace(err)
 	}
@@ -201,61 +199,52 @@ func (b *Bin2es) Pipeline(row map[string]interface{}) error {
 	table  := row["table"].(string)
 	action := row["action"].(string)
 
-	var err error
-	
 	confs := b.event2Pipe[strings.Join([]string{schema, table, action}, "_")]
 	for _, conf := range confs {
 		
-		All := make([]map[string]interface{}, 0)
-		Rows := make([]map[string]interface{}, 0)
-		Rows = append(Rows, row)
-		
-		vPipe := reflect.ValueOf(conf.Pipeline)
-		for i := 0; i < vPipe.NumField(); i++ {
+		Rows := []map[string]interface{}{row}
 
-			TmpRows := make([]map[string]interface{}, 0)
+		for _, Pipeline := range conf.Pipelines {
+			for funcName, funcArgs := range Pipeline {
 
-			for _, Row := range Rows {
+				TmpRows := make([]map[string]interface{}, 0)
+				
+				for _, Row := range Rows {
 
-				vJob := vPipe.Field(i)
-				args := make([]reflect.Value, 0)
-				args = append(args, reflect.ValueOf(Row))
-				for j := 0; j < vJob.NumField(); j++ {
-					args = append(args, vJob.Field(j))
-				}
+					Args := []reflect.Value{reflect.ValueOf(Row), reflect.ValueOf(funcArgs.(map[string]interface{}))}
 
-				RetValues := b.refFuncMap[vPipe.Field(i).Type().Name()].Call(args)
+					RetValues := b.refFuncMap[funcName].Call(Args)
 
-				NewRows := RetValues[0].Interface().(ROWS)
-				if len(NewRows) == 0 {
-					return nil
-				}
-				TmpRows = append(TmpRows, NewRows...)
+					NewRows := RetValues[0].Interface().(ROWS)
+					if len(NewRows) == 0 {
+						return nil
+					}
+					TmpRows = append(TmpRows, NewRows...)
 
-				if !RetValues[1].IsNil() {
-					if err = RetValues[1].Interface().(error); err != nil {
-						return errors.Trace(err)
+					if !RetValues[1].IsNil() {
+						if err := RetValues[1].Interface().(error); err != nil {
+							return errors.Trace(err)
+						}
 					}
 				}
-			}
-			Rows = TmpRows
-		}
 
-		All = append(All, Rows...)
+				Rows = TmpRows
+			}
+		}
 
 		switch action {
 		case "insert":
-			for _, row := range All {
+			for _, row := range Rows {
 				request := es7.NewBulkIndexRequest().Index(conf.Dest.Index).Id(row["id"].(string)).Doc(row)
 				b.esCli.BulkService.Add(request).Refresh("true")
 			}
 		case "update":
-			for _, row := range All {
+			for _, row := range Rows {
 				request := es7.NewBulkUpdateRequest().Index(conf.Dest.Index).Id(row["id"].(string)).Doc(row).DocAsUpsert(true)
 				b.esCli.BulkService.Add(request).Refresh("true")
 			}
 		case "delete":
-			for _, row := range All {
+			for _, row := range Rows {
 				request := es7.NewBulkDeleteRequest().Index(conf.Dest.Index).Id(row["id"].(string))
 				b.esCli.BulkService.Add(request).Refresh("true")
 			}

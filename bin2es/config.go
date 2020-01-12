@@ -55,32 +55,15 @@ func NewConfig(data string) (*Config, error) {
 type Pos2Field  map[string]int
 type Field      map[string]string
 type Replace    map[string]string
+type Pipeline   map[string]interface{}
 type ROWS       []map[string]interface{}
 
 type Bin2esConfig []struct {
-	Schema   string   `json:"schema"`
-	Tables   []string `json:"tables"`
-	Actions  []string `json:"actions"`
-	Pipeline Pipeline `json:"pipeline"`
-	Dest     Dest     `json:"dest"`
-}
-type PkDoSQL struct {
-	SQL     	string 		`json:"sql"`
-	Replaces 	[]Replace 	`json:"replaces"`
-}
-type NestedObj struct {
-	Common 		string   	`json:"common"`
-	Fields 		[]Field   	`json:"fields"`
-}
-type NestedArray struct {
-	SQLField   	string       `json:"sql_field"`
-	Common     	string       `json:"common"`
-	Pos2Fields 	[]Pos2Field  `json:"pos2fields"`
-}
-type Pipeline struct {
-	PkDoSQL     PkDoSQL     `json:"PkDoSQL"`
-	NestedObj   NestedObj   `json:"NestedObj"`
-	NestedArray NestedArray `json:"NestedArray"`
+	Schema   	string   	`json:"schema"`
+	Tables   	[]string 	`json:"tables"`
+	Actions  	[]string 	`json:"actions"`
+	Pipelines 	[]Pipeline 	`json:"pipelines"`
+	Dest     	Dest     	`json:"dest"`
 }
 type Dest struct {
 	Index  string `json:"index"`

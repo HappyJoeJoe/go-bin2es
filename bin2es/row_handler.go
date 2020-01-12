@@ -14,26 +14,34 @@ type reflectFunc struct {
  * eg: 若遇到了`Parent`表, 则自动将`?`替换为
  *     Parent.id = xx
  */
-func (r reflectFunc) PkDoSQL(row map[string]interface{}, SQL string, replaces []Replace) (ROWS, error) {
+func (r reflectFunc) PkDoSQL(row map[string]interface{}, funcArgs map[string]interface{}) (ROWS, error) {
 	rows := make(ROWS, 0)
 
+	// 参数
+	SQL := funcArgs["sql"].(string)
 	if SQL == "" {
 		rows = append(rows, row)
 		return rows, nil
 	}
 
-	schema 	:= row["schema"].(string)
-	table  	:= row["table"].(string)
-	body  	:= row["body"].(map[string]interface{})
-
 	mapping := make(map[string]string)
-	var replaceStr string
-	for _, replace := range replaces {
-		for tblStr, fieldStr := range replace {
-			mapping[tblStr] = fieldStr
+	// 参数
+	Replaces := funcArgs["replaces"].([]interface{})
+	for _, Replace := range Replaces {
+		for tblStr, fieldStr := range Replace.(map[string]interface{}) {
+			if tblStr == "" || fieldStr == nil || fieldStr.(string) == "" {
+				rows = append(rows, row)
+				return rows, nil
+			}
+			mapping[tblStr] = fieldStr.(string)
 		}
 	}
 
+	schema := row["schema"].(string)
+	table  := row["table"].(string)
+	body   := row["body"].(map[string]interface{})
+
+	var replaceStr string
 	replaceStr = strings.Join([]string{table, mapping[table]}, ".")
 	replaceStr = strings.Join([]string{replaceStr, body[mapping[table]].(string)}, " = ")
 
@@ -85,24 +93,31 @@ func (r reflectFunc) PkDoSQL(row map[string]interface{}, SQL string, replaces []
 
 /* fuction: 处理嵌套对象
  * Common 表示最终映射到es上的object名字
- * fields 表示sql映射到es上的键值对
+ * Fields 表示sql映射到es上的键值对
  */
-func (r reflectFunc) NestedObj(row map[string]interface{}, Common string, fields []Field) (ROWS, error) {
-	
+func (r reflectFunc) NestedObj(row map[string]interface{}, funcArgs map[string]interface{}) (ROWS, error) {
 	rows := make(ROWS, 0)
 
+	//参数
+	Common := funcArgs["common"].(string)
+	Fields := funcArgs["fields"].([]interface{})
+
 	//参数校验
-	if Common == "" || fields == nil {
+	if Common == "" || Fields == nil || len(Fields) == 0 {
 		rows = append(rows, row)
 		return rows, nil
 	}
 
 	common := make(map[string]interface{})
-	for _, map_field := range fields {
-		for sql_name, es_name := range map_field {
-			if row[sql_name] != nil {
-				common[es_name] = row[sql_name]
-				delete(row, sql_name)
+	for _, MapField := range Fields {
+		for SQLName, ESName := range MapField.(map[string]interface{}) {
+			if SQLName == "" || ESName == nil || ESName.(string) == "" {
+				rows = append(rows, row)
+				return rows, nil
+			}
+			if row[SQLName] != nil {
+				common[ESName.(string)] = row[SQLName]
+				delete(row, SQLName)
 			}
 		}
 	}
@@ -116,42 +131,49 @@ func (r reflectFunc) NestedObj(row map[string]interface{}, Common string, fields
 /* fuction: 处理嵌套数组
  * SQLField 表示要解析的sql字段
  * Common 表示最终映射到es上的object名字
- * pos2Fields 表示最终映射到es上的[键:值]对
+ * Pos2Fields 表示最终映射到es上的[键:值]对
  *     键: 表示es上的数组对象的key
  *     值: 表示行记录的`SQLField`字段被','解析的字符串数组的每个值, 该值又继续被'_'解析的字符串数组的对应的索引
+ * FieldsSeprator 表示被连接字段之间的分隔符
+ * GroupSeprator  表示组分隔符
  * eg: '68_3,94_3,94_3'
  *     被解析为: [[68, 3], [94, 3], [94, 3]]
  *     其中`68`对应的位置是`1`, 而`3`对应的位置是`2`
  */
-func (r reflectFunc) NestedArray(row map[string]interface{}, SQLField string, Common string, pos2Fields []Pos2Field) (ROWS, error) {
-
+func (r reflectFunc) NestedArray(row map[string]interface{}, funcArgs map[string]interface{}) (ROWS, error) {
 	rows := make(ROWS, 0)
+
+	//参数
+	SQLField       := funcArgs["sql_field"].(string)
+	Common         := funcArgs["common"].(string)
+	Pos2Fields     := funcArgs["pos2fields"].([]interface{})
+	GroupSeprator  := funcArgs["group_seprator"].(string)
+	FieldsSeprator := funcArgs["fields_seprator"].(string)
+
 	//参数校验
-	if SQLField == "" || row[SQLField] == "" || Common == "" || pos2Fields == nil {
-		rows = append(rows, row)
-		return rows, nil
-	}
-	//参数校验
-	if _, ok := row[SQLField]; !ok {
+	if SQLField == "" || row[SQLField] == nil || row[SQLField] == "" || Common == "" || Pos2Fields == nil || len(Pos2Fields) == 0 || FieldsSeprator == "" || GroupSeprator == "" {
 		rows = append(rows, row)
 		return rows, nil
 	}
 
-	toSplitFields := strings.Split(row[SQLField].(string), ",")
+	toSplitFields := strings.Split(row[SQLField].(string), GroupSeprator)
 
 	resFields := make([][]string, 0)
 	for _, field := range toSplitFields {
-		res := strings.Split(field, "_")
+		res := strings.Split(field, FieldsSeprator)
 		resFields = append(resFields, res)
 	}
 
 	common := make([]map[string]string, 0)
-	
 	for _, res := range resFields {
 		obj := make(map[string]string)
-		for _, config := range pos2Fields {
-			for es_name, sql_pos := range config {
-				obj[es_name] = res[sql_pos-1]
+		for _, MapField := range Pos2Fields {
+			for ESName, SQLPos := range MapField.(map[string]interface{}) {
+				if ESName == "" || SQLPos == nil || uint64(SQLPos.(float64)) == 0 {
+					rows = append(rows, row)
+					return rows, nil
+				}
+				obj[ESName] = res[uint64(SQLPos.(float64))-1]
 			}
 		}
 		common = append(common, obj)
@@ -168,6 +190,11 @@ func (r reflectFunc) NestedArray(row map[string]interface{}, SQLField string, Co
  * row:  参数row必传, 表示每一个handler处理过的行数据
  * ROWS: 表示经处理过的行数据, 可以是多行, 比如: 经`PkDoSQL`处理过后变成了一行或多行数据
  */
-func (r reflectFunc) UserDefinedFunc(row map[string]interface{}, Args ...interface{}) (ROWS, error) {
-	return nil, nil
+func (r reflectFunc) UserDefinedFunc(row map[string]interface{}, funcArgs map[string]interface{}) (ROWS, error) {
+	rows := make(ROWS, 0)
+	rows = append(rows, row)
+	
+	//todo
+
+	return rows, nil
 }
