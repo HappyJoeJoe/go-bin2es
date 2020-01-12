@@ -109,7 +109,9 @@ tables = [
                 "pos2fields":[          其中解析结果的第一个位置放入到es的`es_name`下, 第二个位置放入到`es_sex`下
                     {"es_name":1},
                     {"es_sex":2}
-                ]
+                ],
+                "fields_seprator": "_",
+                "group_seprator": ","
             }
         },
         "dest":{
