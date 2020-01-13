@@ -2,6 +2,8 @@ package bin2es
 
 import (
 	"strings"
+
+	"github.com/juju/errors"
 	"database/sql"
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -13,6 +15,7 @@ type reflectFunc struct {
 /* fuction: 执行sql, 并将`SQL`的`?`自动替换为感兴趣表的主键id
  * eg: 若遇到了`Parent`表, 则自动将`?`替换为
  *     Parent.id = xx
+ * 此函数一般用于Pipeline的第一个处理函数
  */
 func (r reflectFunc) PkDoSQL(row map[string]interface{}, funcArgs map[string]interface{}) (ROWS, error) {
 	rows := make(ROWS, 0)
@@ -21,7 +24,7 @@ func (r reflectFunc) PkDoSQL(row map[string]interface{}, funcArgs map[string]int
 	SQL := funcArgs["sql"].(string)
 	if SQL == "" {
 		rows = append(rows, row)
-		return rows, nil
+		return nil, errors.New("sql should not be empty")
 	}
 
 	mapping := make(map[string]string)
@@ -31,7 +34,7 @@ func (r reflectFunc) PkDoSQL(row map[string]interface{}, funcArgs map[string]int
 		for tblStr, fieldStr := range Replace.(map[string]interface{}) {
 			if tblStr == "" || fieldStr == nil || fieldStr.(string) == "" {
 				rows = append(rows, row)
-				return rows, nil
+				return nil, errors.New("replaces invalid")
 			}
 			mapping[tblStr] = fieldStr.(string)
 		}
@@ -75,12 +78,10 @@ func (r reflectFunc) PkDoSQL(row map[string]interface{}, funcArgs map[string]int
 		var value string
 		row_ := make(map[string]interface{}) 
 		for i, col := range values {
-			if col == nil {
-				value = "NULL"
-			} else {
+			if col != nil {
 				value = string(col)
+				row_[columns[i]] = value
 			}
-			row_[columns[i]] = value
 		}
 		rows = append(rows, row_)
 	}
@@ -105,7 +106,7 @@ func (r reflectFunc) NestedObj(row map[string]interface{}, funcArgs map[string]i
 	//参数校验
 	if Common == "" || Fields == nil || len(Fields) == 0 {
 		rows = append(rows, row)
-		return rows, nil
+		return nil, errors.New("params invalid")
 	}
 
 	common := make(map[string]interface{})
@@ -113,7 +114,7 @@ func (r reflectFunc) NestedObj(row map[string]interface{}, funcArgs map[string]i
 		for SQLName, ESName := range MapField.(map[string]interface{}) {
 			if SQLName == "" || ESName == nil || ESName.(string) == "" {
 				rows = append(rows, row)
-				return rows, nil
+				return nil, errors.New("Fields invalid")
 			}
 			if row[SQLName] != nil {
 				common[ESName.(string)] = row[SQLName]
@@ -153,7 +154,7 @@ func (r reflectFunc) NestedArray(row map[string]interface{}, funcArgs map[string
 	//参数校验
 	if SQLField == "" || row[SQLField] == nil || row[SQLField] == "" || Common == "" || Pos2Fields == nil || len(Pos2Fields) == 0 || FieldsSeprator == "" || GroupSeprator == "" {
 		rows = append(rows, row)
-		return rows, nil
+		return nil, errors.New("params invalid")
 	}
 
 	toSplitFields := strings.Split(row[SQLField].(string), GroupSeprator)
@@ -171,7 +172,7 @@ func (r reflectFunc) NestedArray(row map[string]interface{}, funcArgs map[string
 			for ESName, SQLPos := range MapField.(map[string]interface{}) {
 				if ESName == "" || SQLPos == nil || uint64(SQLPos.(float64)) == 0 {
 					rows = append(rows, row)
-					return rows, nil
+					return nil, errors.New("params invalid")
 				}
 				obj[ESName] = res[uint64(SQLPos.(float64))-1]
 			}
@@ -193,16 +194,15 @@ func (r reflectFunc) SetDocID(row map[string]interface{}, funcArgs map[string]in
 	rows := make(ROWS, 0)
 
 	//参数
-	DocID := funcArgs["_id"].(string)
+	DocID := funcArgs["doc_id"].(string)
 	//参数校验
-	if DocID == "" || DocID == "_id" || row[DocID] == nil || row[DocID] == "" {
+	if DocID == "" || DocID == "_id" || row[DocID] == nil || row[DocID] == "" || row["_id"] != nil {
 		rows = append(rows, row)
-		return rows, nil
+		return nil, errors.New("DocID invalid")
 	}
 
-	row["_id"] = row[DocID]
-	delete(row, DocID)
-
+	row["id"] = row[DocID].(string)
+	
 	rows = append(rows, row)
 
 	return rows, nil

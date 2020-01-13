@@ -9,11 +9,13 @@ import (
 	"strconv"
 
 	"github.com/juju/errors"
-	"github.com/siddontang/go-log/log"
 	es7 "github.com/olivere/elastic/v7"
 	"github.com/siddontang/go-mysql/mysql"
 	"github.com/siddontang/go-mysql/canal"
 	"github.com/siddontang/go-mysql/replication"
+
+	// "go.lixinio.com/log"
+	"github.com/siddontang/go-log/log"
 )
 
 type posSaver struct {
@@ -235,17 +237,17 @@ func (b *Bin2es) Pipeline(row map[string]interface{}) error {
 		switch action {
 		case "insert":
 			for _, row := range Rows {
-				request := es7.NewBulkIndexRequest().Index(conf.Dest.Index).Id(row["_id"].(string)).Doc(row)
+				request := es7.NewBulkIndexRequest().Index(conf.Dest.Index).Id(row["id"].(string)).Doc(row)
 				b.esCli.BulkService.Add(request).Refresh("true")
 			}
 		case "update":
 			for _, row := range Rows {
-				request := es7.NewBulkUpdateRequest().Index(conf.Dest.Index).Id(row["_id"].(string)).Doc(row).DocAsUpsert(true)
+				request := es7.NewBulkUpdateRequest().Index(conf.Dest.Index).Id(row["id"].(string)).Doc(row).DocAsUpsert(true)
 				b.esCli.BulkService.Add(request).Refresh("true")
 			}
 		case "delete":
 			for _, row := range Rows {
-				request := es7.NewBulkDeleteRequest().Index(conf.Dest.Index).Id(row["_id"].(string))
+				request := es7.NewBulkDeleteRequest().Index(conf.Dest.Index).Id(row["id"].(string))
 				b.esCli.BulkService.Add(request).Refresh("true")
 			}
 		}

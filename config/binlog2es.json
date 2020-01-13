@@ -39,7 +39,7 @@
             },
             {
                 "SetDocID": {
-                    "_id": "id"
+                    "doc_id": "id"
                 }
             }
         ],
