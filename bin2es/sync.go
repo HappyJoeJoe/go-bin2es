@@ -235,17 +235,17 @@ func (b *Bin2es) Pipeline(row map[string]interface{}) error {
 		switch action {
 		case "insert":
 			for _, row := range Rows {
-				request := es7.NewBulkIndexRequest().Index(conf.Dest.Index).Id(row["id"].(string)).Doc(row)
+				request := es7.NewBulkIndexRequest().Index(conf.Dest.Index).Id(row["_id"].(string)).Doc(row)
 				b.esCli.BulkService.Add(request).Refresh("true")
 			}
 		case "update":
 			for _, row := range Rows {
-				request := es7.NewBulkUpdateRequest().Index(conf.Dest.Index).Id(row["id"].(string)).Doc(row).DocAsUpsert(true)
+				request := es7.NewBulkUpdateRequest().Index(conf.Dest.Index).Id(row["_id"].(string)).Doc(row).DocAsUpsert(true)
 				b.esCli.BulkService.Add(request).Refresh("true")
 			}
 		case "delete":
 			for _, row := range Rows {
-				request := es7.NewBulkDeleteRequest().Index(conf.Dest.Index).Id(row["id"].(string))
+				request := es7.NewBulkDeleteRequest().Index(conf.Dest.Index).Id(row["_id"].(string))
 				b.esCli.BulkService.Add(request).Refresh("true")
 			}
 		}

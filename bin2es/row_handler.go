@@ -186,6 +186,28 @@ func (r reflectFunc) NestedArray(row map[string]interface{}, funcArgs map[string
 	return rows, nil
 }
 
+/* fuction: 用于设置elasticsearch的文档ID
+ * DocID 表示行数据里用于设置文档ID的字段
+ */
+func (r reflectFunc) SetDocID(row map[string]interface{}, funcArgs map[string]interface{}) (ROWS, error) {
+	rows := make(ROWS, 0)
+
+	//参数
+	DocID := funcArgs["_id"].(string)
+	//参数校验
+	if DocID == "" || DocID == "_id" || row[DocID] == nil || row[DocID] == "" {
+		rows = append(rows, row)
+		return rows, nil
+	}
+
+	row["_id"] = row[DocID]
+	delete(row, DocID)
+
+	rows = append(rows, row)
+
+	return rows, nil
+}
+
 /* function: 用户自定义函数
  * row:  参数row必传, 表示每一个handler处理过的行数据
  * ROWS: 表示经处理过的行数据, 可以是多行, 比如: 经`PkDoSQL`处理过后变成了一行或多行数据

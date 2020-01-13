@@ -118,6 +118,11 @@ tables = [
                     "fields_seprator": "_",
                     "group_seprator": ","
                 }
+            },
+            {
+                "SetDocID": {
+                    "_id": "id"
+                }
             }
         ],
         "dest":{
