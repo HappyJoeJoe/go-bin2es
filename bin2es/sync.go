@@ -156,13 +156,13 @@ func (b *Bin2es) syncES() {
 
 		if needPipe {
 			if err = json.Unmarshal(data, &row); err != nil {
-				log.Errorf("json decode error, err:%v", err)
+				log.Errorf("json decode failed, err:%+v", err)
 				b.cancel()
 				return
 			}
 
 			if err = b.Pipeline(row); err != nil {
-				log.Errorf("pipeline exc error, err:%v", err)
+				log.Errorf("pipeline exc failed, err:%+v", err)
 				b.cancel()
 				return
 			}
@@ -173,17 +173,30 @@ func (b *Bin2es) syncES() {
 		}
 
 		if needFlush && b.esCli.BulkService.NumberOfActions() > 0 {
-			_, err = b.esCli.BulkService.Do(context.TODO())
+			bulkResponse, err := b.esCli.BulkService.Do(context.TODO())
 			if err != nil {
-				log.Errorf("BulkService Do error, err:%v", err)
+				log.Errorf("BulkService Do failed, err:%+v", err)
 				b.cancel()
 				return
+			}
+
+			if bulkResponse == nil {
+				log.Error("bulkResponse should not be nil; got nil")
+				b.cancel()
+				return
+			} 
+
+			failedResults := bulkResponse.Failed()
+			if failedResults != nil && len(failedResults) > 0 {
+				for _, failedResult := range failedResults {
+					log.Errorf("Failed bulk response: %+v", failedResult)
+				}
 			}
 		}
 
 		if needSavePos {
 			if err = b.master.Save(pos); err != nil {
-				log.Errorf("save sync position %s err %v, close sync", pos, err)
+				log.Errorf("save sync position:%s err:%+v, close sync", pos, err)
 				b.cancel()
 				return
 			}
@@ -215,17 +228,21 @@ func (b *Bin2es) Pipeline(row map[string]interface{}) error {
 
 					RetValues := b.refFuncMap[funcName].Call(Args)
 
-					NewRows := RetValues[0].Interface().(ROWS)
-					if len(NewRows) == 0 {
-						return nil
-					}
-					TmpRows = append(TmpRows, NewRows...)
-
 					if !RetValues[1].IsNil() {
 						if err := RetValues[1].Interface().(error); err != nil {
 							return errors.Trace(err)
 						}
 					}
+
+					if RetValues[0].IsNil() || !RetValues[0].CanInterface() {
+						return errors.Errorf("Pipeline:%s RetValues:%+v exception, Row:%+v funcArgs:%+v", funcName, RetValues[0], Row, funcArgs)
+					}
+					NewRows := RetValues[0].Interface().(ROWS)
+					if len(NewRows) == 0 {
+						log.Warnf("Pipeline:%s get null result, Row:%+v funcArgs:%+v", funcName, Row, funcArgs)
+						return nil
+					}
+					TmpRows = append(TmpRows, NewRows...)
 				}
 
 				Rows = TmpRows

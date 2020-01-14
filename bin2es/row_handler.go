@@ -24,7 +24,7 @@ func (r reflectFunc) PkDoSQL(row map[string]interface{}, funcArgs map[string]int
 	SQL := funcArgs["sql"].(string)
 	if SQL == "" {
 		rows = append(rows, row)
-		return nil, errors.New("sql should not be empty")
+		return nil, errors.New("SQL should not be empty")
 	}
 
 	mapping := make(map[string]string)
@@ -34,7 +34,7 @@ func (r reflectFunc) PkDoSQL(row map[string]interface{}, funcArgs map[string]int
 		for tblStr, fieldStr := range Replace.(map[string]interface{}) {
 			if tblStr == "" || fieldStr == nil || fieldStr.(string) == "" {
 				rows = append(rows, row)
-				return nil, errors.Errorf("replaces invalid, Replaces:%+v", Replaces)
+				return nil, errors.Errorf("Replaces invalid, Replaces:%+v", Replaces)
 			}
 			mapping[tblStr] = fieldStr.(string)
 		}
@@ -53,12 +53,12 @@ func (r reflectFunc) PkDoSQL(row map[string]interface{}, funcArgs map[string]int
 	db := r.b.sqlPool[schema]
 	db_rows, err := db.Query(SQL)
 	if err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	columns, err := db_rows.Columns()
 	if err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	values := make([]sql.RawBytes, len(columns))
@@ -72,21 +72,19 @@ func (r reflectFunc) PkDoSQL(row map[string]interface{}, funcArgs map[string]int
 		// get RawBytes from data
 		err = db_rows.Scan(scanArgs...)
 		if err != nil {
-			return nil, err
+			return nil, errors.Trace(err)
 		}
 
-		var value string
 		row_ := make(map[string]interface{}) 
 		for i, col := range values {
 			if col != nil {
-				value = string(col)
-				row_[columns[i]] = value
+				row_[columns[i]] = string(col)
 			}
 		}
 		rows = append(rows, row_)
 	}
 	if err = db_rows.Err(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	return rows, nil
@@ -106,7 +104,7 @@ func (r reflectFunc) NestedObj(row map[string]interface{}, funcArgs map[string]i
 	//参数校验
 	if Common == "" || Fields == nil || len(Fields) == 0 {
 		rows = append(rows, row)
-		return nil, errors.Errorf("params invalid, Common:%+v Fields:%+v", Common, Fields)
+		return nil, errors.Errorf("Params invalid, Common:%+v Fields:%+v", Common, Fields)
 	}
 
 	common := make(map[string]interface{})
@@ -154,7 +152,7 @@ func (r reflectFunc) NestedArray(row map[string]interface{}, funcArgs map[string
 	//参数校验
 	if SQLField == "" || row[SQLField] == nil || row[SQLField] == "" || Common == "" || Pos2Fields == nil || len(Pos2Fields) == 0 || FieldsSeprator == "" || GroupSeprator == "" {
 		rows = append(rows, row)
-		return nil, errors.Errorf("params invalid, SQLField:%+v Common:%+v Pos2Fields:%+v FieldsSeprator:%+v GroupSeprator:%+v row:%+v", SQLField, Common, Pos2Fields, FieldsSeprator, GroupSeprator, row)
+		return nil, errors.Errorf("Params invalid, SQLField:%+v Common:%+v Pos2Fields:%+v FieldsSeprator:%+v GroupSeprator:%+v row:%+v", SQLField, Common, Pos2Fields, FieldsSeprator, GroupSeprator, row)
 	}
 
 	toSplitFields := strings.Split(row[SQLField].(string), GroupSeprator)
