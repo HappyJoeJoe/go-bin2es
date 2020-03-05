@@ -3,8 +3,8 @@ package bin2es
 import (
 	"context"
 
-	"github.com/siddontang/go-log/log"
 	es7 "github.com/olivere/elastic/v7"
+	"github.com/siddontang/go-log/log"
 )
 
 type MyES struct {

@@ -1,0 +1,71 @@
+# github.com/BurntSushi/toml v0.3.1
+github.com/BurntSushi/toml
+# github.com/go-sql-driver/mysql v1.5.0
+github.com/go-sql-driver/mysql
+# github.com/golang/protobuf v1.3.2
+github.com/golang/protobuf/proto
+# github.com/juju/errors v0.0.0-20190930114154-d42613fe1ab9
+github.com/juju/errors
+# github.com/konsorten/go-windows-terminal-sequences v1.0.1
+github.com/konsorten/go-windows-terminal-sequences
+# github.com/mailru/easyjson v0.7.1
+github.com/mailru/easyjson
+github.com/mailru/easyjson/buffer
+github.com/mailru/easyjson/jlexer
+github.com/mailru/easyjson/jwriter
+# github.com/olivere/elastic/v7 v7.0.12
+github.com/olivere/elastic/v7
+github.com/olivere/elastic/v7/config
+github.com/olivere/elastic/v7/uritemplates
+# github.com/pingcap/errors v0.11.0
+github.com/pingcap/errors
+# github.com/pingcap/parser v0.0.0-20190506092653-e336082eb825
+github.com/pingcap/parser
+github.com/pingcap/parser/ast
+github.com/pingcap/parser/auth
+github.com/pingcap/parser/charset
+github.com/pingcap/parser/format
+github.com/pingcap/parser/model
+github.com/pingcap/parser/mysql
+github.com/pingcap/parser/opcode
+github.com/pingcap/parser/terror
+github.com/pingcap/parser/types
+# github.com/pingcap/tipb v0.0.0-20190428032612-535e1abaa330
+github.com/pingcap/tipb/go-tipb
+github.com/pingcap/tipb/sharedbytes
+# github.com/pkg/errors v0.9.1
+github.com/pkg/errors
+# github.com/satori/go.uuid v1.2.0
+github.com/satori/go.uuid
+# github.com/shopspring/decimal v0.0.0-20180709203117-cd690d0c9e24
+github.com/shopspring/decimal
+# github.com/siddontang/go v0.0.0-20180604090527-bdc77568d726
+github.com/siddontang/go/hack
+# github.com/siddontang/go-log v0.0.0-20190221022429-1e957dd83bed
+github.com/siddontang/go-log/log
+github.com/siddontang/go-log/loggers
+# github.com/siddontang/go-mysql v0.0.0-20200222075837-12e89848f047
+github.com/siddontang/go-mysql/canal
+github.com/siddontang/go-mysql/client
+github.com/siddontang/go-mysql/dump
+github.com/siddontang/go-mysql/mysql
+github.com/siddontang/go-mysql/packet
+github.com/siddontang/go-mysql/replication
+github.com/siddontang/go-mysql/schema
+# github.com/sirupsen/logrus v1.4.2
+github.com/sirupsen/logrus
+# golang.org/x/sys v0.0.0-20200122134326-e047566fdf82
+golang.org/x/sys/unix
+# golang.org/x/text v0.3.2
+golang.org/x/text/encoding
+golang.org/x/text/encoding/charmap
+golang.org/x/text/encoding/internal
+golang.org/x/text/encoding/internal/identifier
+golang.org/x/text/encoding/japanese
+golang.org/x/text/encoding/korean
+golang.org/x/text/encoding/simplifiedchinese
+golang.org/x/text/encoding/traditionalchinese
+golang.org/x/text/encoding/unicode
+golang.org/x/text/internal/utf8internal
+golang.org/x/text/runes
+golang.org/x/text/transform

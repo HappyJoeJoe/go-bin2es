@@ -9,10 +9,19 @@ import (
 )
 
 type Config struct {
-	DataDir  string   `toml:"data_dir"`
+	MasterInfo MasterInfo `toml:"master_info"`
 	Es       Es       `toml:"es"`
 	Mysql    Mysql    `toml:"mysql"`
 	Sources  []Source `toml:"source"`
+}
+type MasterInfo struct {
+	Addr    string `toml:"addr"`
+	Port    int    `toml:"port"`
+	User    string `toml:"user"`
+	Pwd     string `toml:"pwd"`
+	Charset string `toml:"charset"`
+	Schema  string `toml:"schema"`
+	Table   string `toml:"table"`
 }
 type Es struct {
 	Nodes         []string `toml:"nodes"`
@@ -21,6 +30,7 @@ type Es struct {
 }
 type Mysql struct {
 	Addr     string `toml:"addr"`
+	Port     uint64 `toml:"port"`
 	User     string `toml:"user"`
 	Pwd      string `toml:"pwd"`
 	Charset  string `toml:"charset"`

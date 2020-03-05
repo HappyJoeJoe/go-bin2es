@@ -5,14 +5,14 @@ import (
 	"sync"
 	"time"
 	"reflect"
-	"strings"
+	"fmt"
 
 	"github.com/juju/errors"
 	"github.com/siddontang/go-mysql/canal"
-	"github.com/siddontang/go-log/log"
 	es7 "github.com/olivere/elastic/v7"
 	"database/sql"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/siddontang/go-log/log"
 )
 
 type Empty 	   	 struct{}
@@ -50,7 +50,7 @@ func NewBin2es(c *Config) (*Bin2es, error) {
 	b.ctx, b.cancel = context.WithCancel(context.Background())
 
 	var err error
-	if b.master, err = loadMasterInfo(c.DataDir); err != nil {
+	if b.master, err = loadMasterInfo(c.Mysql.ServerID, c.MasterInfo); err != nil {
 		return nil, errors.Trace(err)
 	}
 
@@ -71,11 +71,12 @@ func NewBin2es(c *Config) (*Bin2es, error) {
 
 func (b *Bin2es) newCanal() error {
 	cfg := canal.NewDefaultConfig()
-	cfg.Addr = b.c.Mysql.Addr
+	cfg.Addr = fmt.Sprintf("%s:%d", b.c.Mysql.Addr, b.c.Mysql.Port)
 	cfg.User = b.c.Mysql.User
 	cfg.Password = b.c.Mysql.Pwd
 	cfg.Charset = b.c.Mysql.Charset
 	cfg.Flavor = "mysql"
+	cfg.SemiSyncEnabled = true
 
 	cfg.ServerID = b.c.Mysql.ServerID
 	cfg.Dump.ExecutionPath = "mysqldump"
@@ -83,7 +84,10 @@ func (b *Bin2es) newCanal() error {
 	cfg.Dump.SkipMasterData = false
 
 	var err error
-	b.canal, err = canal.NewCanal(cfg)
+	if b.canal, err = canal.NewCanal(cfg); err != nil {
+		return errors.Trace(err)
+	}
+
 	b.canal.SetEventHandler(&eventHandler{b})
 
 	//init tblFilter
@@ -129,7 +133,7 @@ func (b *Bin2es) initBin2esConf() error {
 		set[schema] = Empty{}
 		for _, table := range conf.Tables {
 			for _, action := range conf.Actions {
-				key := strings.Join([]string{schema, table, action}, "_")
+				key := fmt.Sprintf("%s_%s_%s", schema, table, action)
 				b.event2Pipe[key] = append(b.event2Pipe[key], conf)
 			}
 		}
@@ -140,8 +144,9 @@ func (b *Bin2es) initBin2esConf() error {
 		user := b.c.Mysql.User
 		pwd  := b.c.Mysql.Pwd
 		addr := b.c.Mysql.Addr
+		port := toString(b.c.Mysql.Port)
 		charset := b.c.Mysql.Charset
-		dsn  := strings.Join([]string{user, ":", pwd, "@tcp(", addr, ")/", schema, "?charset=", charset}, "")
+		dsn  := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=%s", user, pwd, addr, port, schema, charset)
 		
 		db, err := sql.Open("mysql", dsn)
 		if err != nil {

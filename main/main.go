@@ -8,19 +8,16 @@ import (
 	"flag"
 
 	"github.com/juju/errors"
-	"github.com/siddontang/go-log/log"
 	"go-bin2es/bin2es"
+	"github.com/siddontang/go-log/log"
 )
 
 var conf_path = flag.String("config", "./config/config.toml", "config file path")
-var logLevel = flag.String("log_level", "info", "log level")
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	flag.Parse()
 	
-	log.SetLevelByName(*logLevel)
-
 	// 创建信号频道 sc
 	sc := make(chan os.Signal, 1) 
 	signal.Notify(

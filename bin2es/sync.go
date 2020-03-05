@@ -1,9 +1,9 @@
 package bin2es
 
 import (
+	"fmt"
 	"reflect"
 	"encoding/json"
-	"strings"
 	"context"
 	"time"
 	"strconv"
@@ -66,14 +66,15 @@ func (h *eventHandler) OnRow(e *canal.RowsEvent) error {
 	action  := e.Action
 	message := make(map[string]interface{})
 
-	if (h.b.isInTblFilter(schema+"."+table) != true) {
-		return h.b.ctx.Err()
+	if action == "delete" || h.b.isInTblFilter(schema+"."+table) != true {
+		return nil
 	}
 
 	var values []interface{}
-	if action == "insert" || action == "delete" {
+	switch action {
+	case "insert":
 		values = e.Rows[0]
-	} else if (action == "update"){
+	case "update":
 		values = e.Rows[1]
 	}
 
@@ -93,7 +94,7 @@ func (h *eventHandler) OnRow(e *canal.RowsEvent) error {
 
 	h.b.syncCh <- ReqJson{data}
 
-	return h.b.ctx.Err()
+	return nil
 }
 
 //DDL, DML语句触发
@@ -212,7 +213,7 @@ func (b *Bin2es) Pipeline(row map[string]interface{}) error {
 	table  := row["table"].(string)
 	action := row["action"].(string)
 
-	confs := b.event2Pipe[strings.Join([]string{schema, table, action}, "_")]
+	confs := b.event2Pipe[fmt.Sprintf("%s_%s_%s", schema, table, action)]
 	for _, conf := range confs {
 		
 		Rows := []map[string]interface{}{row}
@@ -239,7 +240,7 @@ func (b *Bin2es) Pipeline(row map[string]interface{}) error {
 					}
 					NewRows := RetValues[0].Interface().(ROWS)
 					if len(NewRows) == 0 {
-						log.Warnf("Pipeline:%s get null result, Row:%+v funcArgs:%+v", funcName, Row, funcArgs)
+						// log.Warnf("Pipeline:%s get null result, Row:%+v funcArgs:%+v", funcName, Row, funcArgs)
 						return nil
 					}
 					TmpRows = append(TmpRows, NewRows...)
@@ -258,11 +259,6 @@ func (b *Bin2es) Pipeline(row map[string]interface{}) error {
 		case "update":
 			for _, row := range Rows {
 				request := es7.NewBulkUpdateRequest().Index(conf.Dest.Index).Id(row["id"].(string)).Doc(row).DocAsUpsert(true)
-				b.esCli.BulkService.Add(request).Refresh("true")
-			}
-		case "delete":
-			for _, row := range Rows {
-				request := es7.NewBulkDeleteRequest().Index(conf.Dest.Index).Id(row["id"].(string))
 				b.esCli.BulkService.Add(request).Refresh("true")
 			}
 		}
