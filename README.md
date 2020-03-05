@@ -10,7 +10,7 @@ go-bin2es is a service syncing binlog to es
 + 实时性高, 低时延
 + 保证数据最终一致性
 + 不支持`delete`操作
-+ 支持自定义函数[UserDefinedFunc](https://github.com/HappyJoeJoe/go-bin2es/blob/36d6fd74b7dcfc8cc5c0a304548e45e9836fbec0/bin2es/row_handler.go#L230)去处理es数据, 可扩展更强
++ 支持自定义函数[UserDefinedFunc](https://github.com/HappyJoeJoe/go-bin2es/blob/36d6fd74b7dcfc8cc5c0a304548e45e9836fbec0/bin2es/row_handler.go#L193)去处理es数据, 可扩展更强
 
 
 # Example
