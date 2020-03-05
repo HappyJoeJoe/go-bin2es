@@ -39,14 +39,12 @@ for seq in range(5000):
 		db.commit()
 		print("executing", seq, "SQL:", test['sql'])
 		time.sleep(0.5)
-		# response = requests.get('http://localhost:9200/test_es/_doc/1')
-		# dict = json.loads(str(response.content, encoding = "utf8"))
-		# # print(dict)
-		# field = dict['_source']['name']
-		# if test['name'] != field:
-		# 	print("db: ", test['name'])
-		# 	print("es: ", field)
-		# 	rows = rows + 1
+		response = requests.get('http://localhost:9200/test_es/_doc/1')
+		dict = json.loads(str(response.content, encoding = "utf8"))
+		if test['name'] != dict['_source']['name']:
+			print("db: ", test['name'])
+			print("es: ", dict['_source']['name'])
+			rows = rows + 1
 
 print(rows, "rows(s) unexpected!")
 # 关闭数据库连接
