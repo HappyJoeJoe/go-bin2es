@@ -58,15 +58,13 @@ nodes = [
 bulk_size = 1024  #批量刷新个数
 flush_duration = 500  #批量刷新时间间隔, 单位:ms
 
-
 [mysql]
 addr = "localhost"
 port = 3306
 user = "bin2es"
 pwd = "bin2es"
 charset = "utf8mb4"
-server_id = 2 #与其他slave节点的server_id不同即可
-
+server_id = 3 #与其他slave节点的server_id不同即可
 
 [master_info]
 addr = "localhost"
@@ -76,13 +74,33 @@ pwd = "bin2es"
 charset = "utf8mb4"
 schema = "bin2es"
 table = "master_info"
+flush_duration = 3  #binlog position 刷新时间间隔, 单位:s
 
+[zk]
+enable = false
+lock_path = "/go-bin2es-lock"
+session_timeout = 1
+hosts = [
+    "localhost:2181"
+]
+
+[etcd]
+enable = true
+enable_tls = true
+lock_path = "/go-bin2es-lock"
+dial_timeout = 3
+cert_path = "/etc/etcd/etcdSSL/etcd.pem"
+key_path = "/etc/etcd/etcdSSL/etcd-key.pem"
+ca_path = "/etc/etcd/etcdSSL/ca.pem"
+endpoints = [
+    "127.0.0.1:2379",
+]
 
 [[source]]
-schema = "test"  #filter table `Parent`和`Child` in schema test, can be multiple
+schema = "test"
 tables = [
-	"Parent",
-	"Child"
+    "Parent",
+    "Child"
 ]
 
 ```
@@ -106,14 +124,14 @@ tables = [
             {
                 "DoSQL":{
                     "sql":"SELECT Parent.id, Parent.name, Parent.sex, group_concat(concat_ws('_', Child.name, Child.sex) separator ',') as Childs FROM Parent join Child on Parent.id = Child.parent_id WHERE (?) GROUP BY Parent.id",
-                    "replaces":[              #若遇到Parent或Child, 自动将`?`替换为`$key.$value = {该表对应的$value对应的字段的值}`
+                    "placeholders":{              #若遇到Parent或Child, 自动将`?`替换为`$key.$value = {该表对应的$value对应的字段的值}`
                         {"Parent":"id"},      #eg: 若遇到Parent, 则`?`被替换为`Parent.id = 行数据对应的`id`字段的值`
                         {"Child":"parent_id"} #eg: 若遇到Child, 则`?`被替换为`Child.parent_id = 行数据对应的`parent_id`字段的值`
-                    ]
+                    }
                 }
             },
             {
-                "NestedObj":{
+                "Object":{
                     "common":"profile",
                     "fields":[
                         {"name":"es_name"},   #将查询到的结果的`name`字段放进`profile`的`es_name`下

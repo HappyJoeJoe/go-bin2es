@@ -1,17 +1,17 @@
 package bin2es
 
 import (
+	//系统
+	"context"
 	"fmt"
 	"reflect"
-	"encoding/json"
-	"context"
-	"time"
 	"strconv"
-
+	"time"
+	//第三方
 	"github.com/juju/errors"
 	es7 "github.com/olivere/elastic/v7"
-	"github.com/siddontang/go-mysql/mysql"
 	"github.com/siddontang/go-mysql/canal"
+	"github.com/siddontang/go-mysql/mysql"
 	"github.com/siddontang/go-mysql/replication"
 	"github.com/siddontang/go-log/log"
 )
@@ -22,7 +22,7 @@ type posSaver struct {
 }
 
 type ReqJson struct {
-	data []byte
+	data interface{}
 }
 
 type eventHandler struct {
@@ -60,10 +60,10 @@ func (h *eventHandler) OnXID(nextPos mysql.Position) error {
 
 //DML语句触发
 func (h *eventHandler) OnRow(e *canal.RowsEvent) error {
-	schema  := e.Table.Schema
-	table   := e.Table.Name
+	schema := e.Table.Schema
+	table := e.Table.Name
 	columns := e.Table.Columns
-	action  := e.Action
+	action := e.Action
 	message := make(map[string]interface{})
 
 	if action == "delete" || h.b.isInTblFilter(schema+"."+table) != true {
@@ -83,16 +83,11 @@ func (h *eventHandler) OnRow(e *canal.RowsEvent) error {
 		body[columns[i].Name] = toString(values[i])
 	}
 	message["schema"] = schema
-	message["table"]  = table
+	message["table"] = table
 	message["action"] = action
-	message["body"]   = body
+	message["body"] = body
 
-	data, err := json.Marshal(message)
-	if err != nil {
-		return errors.Trace(err)
-	}
-
-	h.b.syncCh <- ReqJson{data}
+	h.b.syncCh <- ReqJson{message}
 
 	return nil
 }
@@ -113,7 +108,7 @@ func (h *eventHandler) String() string {
 
 func (b *Bin2es) syncES() {
 	defer log.Info("----- syncES quit -----")
-	defer func() {b.finish<-true}()
+	defer func() { b.finish <- true }()
 	defer b.wg.Done()
 
 	log.Infof("begin to sync binlog to es")
@@ -125,7 +120,7 @@ func (b *Bin2es) syncES() {
 	row := make(map[string]interface{})
 	var pos mysql.Position
 	var err error
-	var data []byte
+
 	for {
 		needPipe := false
 		needFlush := false
@@ -135,33 +130,27 @@ func (b *Bin2es) syncES() {
 			switch v := v.(type) {
 			case posSaver:
 				now := time.Now()
-				if v.force || now.Sub(lastSavedTime) > 3*time.Second {
+				if v.force || now.Sub(lastSavedTime) > time.Duration(b.c.MasterInfo.FlushDuration)*time.Second {
 					lastSavedTime = now
 					needFlush = true
 					needSavePos = true
 					pos = v.pos
 				}
 			case ReqJson:
-				data = v.data
+				row = v.data.(map[string]interface{})
 				needPipe = true
 			default:
-    			log.Errorf("unrecognized type:%s", reflect.TypeOf(v))
-    			b.cancel()
-    			return
-    		}
-    	case <-ticker.C:
-    		needFlush = true
+				log.Errorf("unrecognized type:%s", reflect.TypeOf(v))
+				b.cancel()
+				return
+			}
+		case <-ticker.C:
+			needFlush = true
 		case <-b.ctx.Done():
 			return
 		}
 
 		if needPipe {
-			if err = json.Unmarshal(data, &row); err != nil {
-				log.Errorf("json decode failed, err:%+v", err)
-				b.cancel()
-				return
-			}
-
 			if err = b.Pipeline(row); err != nil {
 				log.Errorf("pipeline exc failed, err:%+v", err)
 				b.cancel()
@@ -185,13 +174,15 @@ func (b *Bin2es) syncES() {
 				log.Error("bulkResponse should not be nil; got nil")
 				b.cancel()
 				return
-			} 
+			}
 
 			failedResults := bulkResponse.Failed()
 			if failedResults != nil && len(failedResults) > 0 {
 				for _, failedResult := range failedResults {
 					log.Errorf("Failed bulk response: %+v", failedResult)
 				}
+				b.cancel()
+				return
 			}
 		}
 
@@ -208,21 +199,21 @@ func (b *Bin2es) syncES() {
 }
 
 func (b *Bin2es) Pipeline(row map[string]interface{}) error {
-	
+
 	schema := row["schema"].(string)
-	table  := row["table"].(string)
+	table := row["table"].(string)
 	action := row["action"].(string)
 
 	confs := b.event2Pipe[fmt.Sprintf("%s_%s_%s", schema, table, action)]
 	for _, conf := range confs {
-		
+
 		Rows := []map[string]interface{}{row}
 
 		for _, Pipeline := range conf.Pipelines {
 			for funcName, funcArgs := range Pipeline {
 
 				TmpRows := make([]map[string]interface{}, 0)
-				
+
 				for _, Row := range Rows {
 
 					Args := []reflect.Value{reflect.ValueOf(Row), reflect.ValueOf(funcArgs.(map[string]interface{}))}
@@ -240,7 +231,7 @@ func (b *Bin2es) Pipeline(row map[string]interface{}) error {
 					}
 					NewRows := RetValues[0].Interface().(ROWS)
 					if len(NewRows) == 0 {
-						// log.Warnf("Pipeline:%s get null result, Row:%+v funcArgs:%+v", funcName, Row, funcArgs)
+						log.Warnf("Pipeline:%s get null result, Row:%+v funcArgs:%+v", funcName, Row, funcArgs)
 						return nil
 					}
 					TmpRows = append(TmpRows, NewRows...)
@@ -250,17 +241,18 @@ func (b *Bin2es) Pipeline(row map[string]interface{}) error {
 			}
 		}
 
-		switch action {
-		case "insert":
-			for _, row := range Rows {
-				request := es7.NewBulkIndexRequest().Index(conf.Dest.Index).Id(row["id"].(string)).Doc(row)
-				b.esCli.BulkService.Add(request).Refresh("true")
+		var request es7.BulkableRequest
+		for _, row := range Rows {
+			doc_id := row["_id"].(string)
+			delete(row, "_id")
+
+			switch action {
+			case "insert":
+				request = es7.NewBulkIndexRequest().Index(conf.Dest.Index).Id(doc_id).Doc(row)
+			case "update":
+				request = es7.NewBulkUpdateRequest().Index(conf.Dest.Index).Id(doc_id).Doc(row).DocAsUpsert(true)
 			}
-		case "update":
-			for _, row := range Rows {
-				request := es7.NewBulkUpdateRequest().Index(conf.Dest.Index).Id(row["id"].(string)).Doc(row).DocAsUpsert(true)
-				b.esCli.BulkService.Add(request).Refresh("true")
-			}
+			b.esCli.BulkService.Add(request).Refresh("true")
 		}
 	}
 

@@ -1,39 +1,40 @@
 package bin2es
 
 import (
+	//系统
 	"fmt"
 	"sync"
-
-	"github.com/juju/errors"
-	"github.com/siddontang/go-mysql/mysql"
+	//第三方
 	"database/sql"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/juju/errors"
+	"github.com/siddontang/go-mysql/mysql"
 	"github.com/siddontang/go-log/log"
 )
 
 type masterInfo struct {
 	sync.RWMutex
 
-	DB		 *sql.DB
+	DB       *sql.DB
 	ServerID uint32
-	Schema	 string
-	Table	 string
-	Name	 string
-	Pos		 uint32
+	Schema   string
+	Table    string
+	Name     string
+	Pos      uint32
 }
 
 func loadMasterInfo(server_id uint32, master_info MasterInfo) (*masterInfo, error) {
 	var m masterInfo
 
-	user   := master_info.User
-	pwd    := master_info.Pwd
-	addr   := master_info.Addr
-	port   := toString(master_info.Port)
+	user := master_info.User
+	pwd := master_info.Pwd
+	addr := master_info.Addr
+	port := toString(master_info.Port)
 	schema := master_info.Schema
-	table  := master_info.Table
+	table := master_info.Table
 	charset := master_info.Charset
-	dsn  := fmt.Sprintf("%s:%s@tcp(%s:%s)/?charset=%s", user, pwd, addr, port, charset)
-	
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/?charset=%s", user, pwd, addr, port, charset)
+
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		log.Errorf("sql Open error: %s", err)
@@ -60,14 +61,14 @@ func loadMasterInfo(server_id uint32, master_info MasterInfo) (*masterInfo, erro
 			PRIMARY KEY (server_id)
 		)ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='binlog位置表'
 	`, schema, table)
-    if _, err := db.Exec(tblSQL); err != nil {
+	if _, err := db.Exec(tblSQL); err != nil {
 		log.Errorf("create table %s failed, err:%s", table, err)
 		return nil, errors.Trace(err)
 	}
 
 	//读取master_info的`bin_name` `bin_pos`
 	var Name string
-	var Pos  uint32
+	var Pos uint32
 	querySQL := fmt.Sprintf("SELECT bin_name, bin_pos FROM %s.%s WHERE server_id = %d", schema, table, server_id)
 	rows, err := db.Query(querySQL)
 	if err != nil {
@@ -84,7 +85,7 @@ func loadMasterInfo(server_id uint32, master_info MasterInfo) (*masterInfo, erro
 			log.Errorf("iteration %s.%s failed, err:%s", schema, table, err)
 			return nil, errors.Trace(err)
 		}
-		log.Errorf("bin_name:%s bin_pos:%d", Name, Pos)
+		log.Infof("bin_name:%s bin_pos:%d", Name, Pos)
 	}
 	err = rows.Err()
 	if err != nil {
@@ -149,8 +150,8 @@ func (m *masterInfo) SetPosition(p mysql.Position) {
 }
 
 func (m *masterInfo) Close() error {
-	log.Info("closing master")
-	
+	log.Info("----- closing master -----")
+
 	pos := m.Position()
 
 	return m.Save(pos)

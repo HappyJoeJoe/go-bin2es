@@ -1,41 +1,42 @@
 package bin2es
 
 import (
+	//系统
 	"context"
+	"fmt"
+	"reflect"
 	"sync"
 	"time"
-	"reflect"
-	"fmt"
-
-	"github.com/juju/errors"
-	"github.com/siddontang/go-mysql/canal"
-	es7 "github.com/olivere/elastic/v7"
+	//第三方
 	"database/sql"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/juju/errors"
+	es7 "github.com/olivere/elastic/v7"
+	"github.com/siddontang/go-mysql/canal"
 	"github.com/siddontang/go-log/log"
 )
 
-type Empty 	   	 struct{}
-type Event2Pipe  map[string]Bin2esConfig
-type RefFuncMap  map[string]reflect.Value
-type SQLPool     map[string]*sql.DB
-type Set   	   	 map[string]Empty
+type Empty struct{}
+type Event2Pipe map[string]Bin2esConfig
+type RefFuncMap map[string]reflect.Value
+type SQLPool map[string]*sql.DB
+type Set map[string]Empty
 
 type Bin2es struct {
-	c      		*Config
-	ctx    		context.Context
-	cancel 		context.CancelFunc
-	canal  		*canal.Canal
-	wg     		sync.WaitGroup
-	master 		*masterInfo
-	esCli  		*MyES
-	syncCh 		chan interface{}
-	refFuncMap  RefFuncMap
-	event2Pipe  Event2Pipe
-	bin2esConf 	Bin2esConfig
-	sqlPool     SQLPool
-	tblFilter 	Set
-	finish      chan bool
+	c          *Config
+	ctx        context.Context
+	cancel     context.CancelFunc
+	canal      *canal.Canal
+	wg         sync.WaitGroup
+	master     *masterInfo
+	esCli      *MyES
+	syncCh     chan interface{}
+	refFuncMap RefFuncMap
+	event2Pipe Event2Pipe
+	bin2esConf Bin2esConfig
+	sqlPool    SQLPool
+	tblFilter  Set
+	finish     chan bool
 }
 
 func NewBin2es(c *Config) (*Bin2es, error) {
@@ -99,7 +100,7 @@ func (b *Bin2es) newCanal() error {
 		}
 	}
 
-	//prepare canal 
+	//prepare canal
 	for _, source := range b.c.Sources {
 		b.canal.AddDumpTables(source.Schema, source.Tables...)
 	}
@@ -142,12 +143,12 @@ func (b *Bin2es) initBin2esConf() error {
 	//initialize db connection
 	for schema, _ := range set {
 		user := b.c.Mysql.User
-		pwd  := b.c.Mysql.Pwd
+		pwd := b.c.Mysql.Pwd
 		addr := b.c.Mysql.Addr
 		port := toString(b.c.Mysql.Port)
 		charset := b.c.Mysql.Charset
-		dsn  := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=%s", user, pwd, addr, port, schema, charset)
-		
+		dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=%s", user, pwd, addr, port, schema, charset)
+
 		db, err := sql.Open("mysql", dsn)
 		if err != nil {
 			log.Errorf("sql Open error: %s", err)
@@ -166,11 +167,11 @@ func (b *Bin2es) initBin2esConf() error {
 
 	//initialize refFuncMap
 	Value := reflect.ValueOf(reflectFunc{b})
-    Type  := Value.Type()
-    for i := 0; i < Value.NumMethod(); i++ {
-    	key := Type.Method(i)
-    	b.refFuncMap[key.Name] = Value.Method(i)
-    }
+	Type := Value.Type()
+	for i := 0; i < Value.NumMethod(); i++ {
+		key := Type.Method(i)
+		b.refFuncMap[key.Name] = Value.Method(i)
+	}
 
 	return nil
 }
@@ -181,8 +182,10 @@ func (b *Bin2es) newES() error {
 	b.esCli.Ctx = b.Ctx()
 	b.esCli.Client, err = es7.NewClient(
 		es7.SetURL(b.c.Es.Nodes...),
-		es7.SetHealthcheckInterval(10*time.Second),
+		es7.SetHealthcheckInterval(5*time.Second),
 		es7.SetGzip(true),
+		es7.SetRetrier(NewMyRetrier()),
+		es7.SetSniff(false),
 	)
 	if err != nil {
 		log.Errorf("Failed to create ES client, err:%s", err)
@@ -244,17 +247,16 @@ func (b *Bin2es) Close() {
 
 	//消耗完剩余syncCh里的消息, 不然会有一定概率阻塞Canal组件的关闭
 	for {
-        select {
-        case <-b.syncCh:
-        default:
-        	goto END
-        }
-    }
+		select {
+		case <-b.syncCh:
+		default:
+			goto END
+		}
+	}
 
 END:
-	log.Infof("close sync channel")
-	
 	close(b.syncCh)
+	log.Info("----- close sync channel -----")
 
 	b.wg.Wait()
 }

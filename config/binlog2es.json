@@ -10,14 +10,14 @@
             {
                 "DoSQL":{
                     "sql":"SELECT Parent.id, Parent.name, Parent.sex, group_concat(concat_ws('_', Child.name, Child.sex) separator ',') as Childs FROM Parent join Child on Parent.id = Child.parent_id WHERE (?) GROUP BY Parent.id",
-                    "replaces":[
-                        {"Parent":"id"},
-                        {"Child":"parent_id"}
-                    ]
+                    "placeholders":{
+                        "Parent":"id",
+                        "Child":"parent_id"
+                    }
                 }
             },
             {
-                "NestedObj":{
+                "Object":{
                     "common":"profile",
                     "fields":[
                         {"name":"es_name"},

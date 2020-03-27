@@ -21,6 +21,27 @@ pwd = "bin2es"
 charset = "utf8mb4"
 schema = "bin2es"
 table = "master_info"
+flush_duration = 3  #binlog position 刷新时间间隔, 单位:s
+
+[zk]
+enable = false
+lock_path = "/go-bin2es-lock"
+session_timeout = 1
+hosts = [
+	"localhost:2181"
+]
+
+[etcd]
+enable = true
+enable_tls = true
+lock_path = "/go-bin2es-lock"
+dial_timeout = 3
+cert_path = "/etc/etcd/etcdSSL/etcd.pem"
+key_path = "/etc/etcd/etcdSSL/etcd-key.pem"
+ca_path = "/etc/etcd/etcdSSL/ca.pem"
+endpoints = [
+	"127.0.0.1:2379",
+]
 
 [[source]]
 schema = "test"

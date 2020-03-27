@@ -1,12 +1,13 @@
 package bin2es
 
 import (
+	//系统
 	"fmt"
 	"strings"
-
-	"github.com/juju/errors"
+	//第三方
 	"database/sql"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/juju/errors"
 	"github.com/siddontang/go-log/log"
 )
 
@@ -28,24 +29,15 @@ func (r reflectFunc) DoSQL(row map[string]interface{}, funcArgs map[string]inter
 		return nil, errors.New("querySQL should not be empty")
 	}
 
-	mapping := make(map[string]string)
-	// 参数
-	Replaces := funcArgs["replaces"].([]interface{})
-	for _, Replace := range Replaces {
-		for tblStr, fieldStr := range Replace.(map[string]interface{}) {
-			if tblStr == "" || fieldStr == nil || fieldStr.(string) == "" {
-				return nil, errors.Errorf("Replaces invalid, Replaces:%+v", Replaces)
-			}
-			mapping[tblStr] = fieldStr.(string)
-		}
-	}
-
 	schema := row["schema"].(string)
-	table  := row["table"].(string)
-	body   := row["body"].(map[string]interface{})
-	db     := r.b.sqlPool[schema]
+	table := row["table"].(string)
+	body := row["body"].(map[string]string)
+	db := r.b.sqlPool[schema]
 
-	detectSQL := fmt.Sprintf("SELECT %s FROM %s.%s WHERE %s = %s FOR UPDATE", mapping[table], schema, table, mapping[table], body[mapping[table]].(string))
+	placeHolders := funcArgs["placeholders"].(map[string]interface{})
+	key := placeHolders[table].(string)
+
+	detectSQL := fmt.Sprintf("SELECT %s FROM %s.%s WHERE %s = %s FOR UPDATE", key, schema, table, key, body[key])
 	detect_rows, err := db.Query(detectSQL)
 	if err != nil {
 		log.Errorf("detectSQL:[%s] execute failed, err:%s", detectSQL, errors.Trace(err))
@@ -58,8 +50,8 @@ func (r reflectFunc) DoSQL(row map[string]interface{}, funcArgs map[string]inter
 		return nil, errors.Trace(err)
 	}
 
-	placeHolder := fmt.Sprintf("%s.%s = %s", table, mapping[table], body[mapping[table]].(string))
-	querySQL = strings.Replace(querySQL, "?", placeHolder, -1)
+	placeHolderStr := fmt.Sprintf("%s.%s = %s", table, key, body[key])
+	querySQL = strings.Replace(querySQL, "?", placeHolderStr, -1)
 	es_rows, err := db.Query(querySQL)
 	if err != nil {
 		log.Errorf("querySQL:[%s] execute failed, err:%s", querySQL, errors.Trace(err))
@@ -104,11 +96,11 @@ func (r reflectFunc) DoSQL(row map[string]interface{}, funcArgs map[string]inter
 	return rows, nil
 }
 
-/* fuction: 处理嵌套对象
+/* fuction: 处理对象类型
  * Common 表示最终映射到es上的object名字
  * Fields 表示sql映射到es上的[键:值]对
  */
-func (r reflectFunc) NestedObj(row map[string]interface{}, funcArgs map[string]interface{}) (ROWS, error) {
+func (r reflectFunc) Object(row map[string]interface{}, funcArgs map[string]interface{}) (ROWS, error) {
 	rows := make(ROWS, 0)
 
 	//参数
@@ -156,10 +148,10 @@ func (r reflectFunc) NestedArray(row map[string]interface{}, funcArgs map[string
 	rows := make(ROWS, 0)
 
 	//参数
-	SQLField       := funcArgs["sql_field"].(string)
-	Common         := funcArgs["common"].(string)
-	Pos2Fields     := funcArgs["pos2fields"].([]interface{})
-	GroupSeprator  := funcArgs["group_seprator"].(string)
+	SQLField := funcArgs["sql_field"].(string)
+	Common := funcArgs["common"].(string)
+	Pos2Fields := funcArgs["pos2fields"].([]interface{})
+	GroupSeprator := funcArgs["group_seprator"].(string)
 	FieldsSeprator := funcArgs["fields_seprator"].(string)
 
 	//参数校验
@@ -216,8 +208,8 @@ func (r reflectFunc) SetDocID(row map[string]interface{}, funcArgs map[string]in
 		return nil, errors.Errorf("DocID invalid, DocID:%+v row:%+v", DocID, row)
 	}
 
-	row["id"] = row[DocID].(string)
-	
+	row["_id"] = row[DocID].(string)
+
 	rows = append(rows, row)
 
 	return rows, nil
@@ -230,7 +222,7 @@ func (r reflectFunc) SetDocID(row map[string]interface{}, funcArgs map[string]in
 func (r reflectFunc) UserDefinedFunc(row map[string]interface{}, funcArgs map[string]interface{}) (ROWS, error) {
 	rows := make(ROWS, 0)
 	rows = append(rows, row)
-	
+
 	//todo
 
 	return rows, nil

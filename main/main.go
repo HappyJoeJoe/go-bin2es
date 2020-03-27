@@ -36,6 +36,35 @@ func main() {
 		return
 	}
 
+
+	var isHA bool
+	var h bin2es.HA
+	if cfg.Etcd.Enable {
+		h, err = bin2es.NewEtcd(cfg)
+		isHA = true
+	} else if cfg.Zk.Enable {
+		h, err = bin2es.NewZK(cfg)
+		isHA = true
+	}
+	if isHA {
+		if err != nil {
+			log.Error(errors.ErrorStack(err))
+			return
+		}
+
+		log.Infof("----- acquiring lock for master-node-%d -----", cfg.Mysql.ServerID)
+
+		if err = h.Lock(); err != nil {
+			log.Error(errors.ErrorStack(err))
+			return
+		}
+		defer func() {
+			defer log.Info("----- close ha -----")
+			h.UnLock()
+			h.Close()
+		}()
+	}
+
 	// 初始化bin2es实例
 	b, err := bin2es.NewBin2es(cfg)
 	if err != nil {
