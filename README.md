@@ -211,7 +211,7 @@ tables = [
                         }
                     ],
                     "id": "1",
-                    "profile": { #nested object
+                    "profile": { # object
                         "es_name": "Tom",
                         "es_sex": "m"
                     }
@@ -234,7 +234,7 @@ tables = [
                         }
                     ],
                     "id": "2",
-                    "profile": { #nested object
+                    "profile": { # object
                         "es_name": "Jerry",
                         "es_sex": "m"
                     }
