@@ -9,6 +9,7 @@ go-bin2es is a service syncing binlog to es
 
 ## 特点:
 + 支持高版本的elasticsearch7
++ 支持全量, 增量导入数据
 + 应用更加轻量级, 占用较少的内存和cpu
 + 原生支持es的对象、嵌套数组类型
 + 实时性高, 低时延
