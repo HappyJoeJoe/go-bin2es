@@ -37,7 +37,7 @@ func (r reflectFunc) DoSQL(row map[string]interface{}, funcArgs map[string]inter
 	placeHolders := funcArgs["placeholders"].(map[string]interface{})
 	key := placeHolders[table].(string)
 
-	detectSQL := fmt.Sprintf("SELECT %s FROM %s.%s WHERE %s = %s FOR UPDATE", key, schema, table, key, body[key])
+	detectSQL := fmt.Sprintf("SELECT %s FROM %s.%s WHERE %s = %s LOCK IN SHARE MODE", key, schema, table, key, body[key])
 	detect_rows, err := db.Query(detectSQL)
 	if err != nil {
 		log.Errorf("detectSQL:[%s] execute failed, err:%s", detectSQL, errors.Trace(err))
