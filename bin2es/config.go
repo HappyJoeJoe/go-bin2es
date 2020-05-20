@@ -10,12 +10,16 @@ import (
 )
 
 type Config struct {
+	Bin2Es     Bin2Es     `toml:"bin2es"`
 	MasterInfo MasterInfo `toml:"master_info"`
 	Zk         Zk         `toml:"zk"`
 	Etcd       Etcd       `toml:"etcd"`
 	Es         Es         `toml:"es"`
 	Mysql      Mysql      `toml:"mysql"`
 	Sources    []Source   `toml:"source"`
+}
+type Bin2Es struct {
+	SyncChLen int `toml:"sync_ch_len"`
 }
 type MasterInfo struct {
 	Addr          string `toml:"addr"`
@@ -44,9 +48,13 @@ type Etcd struct {
 	Endpoints   []string `toml:"endpoints"`
 }
 type Es struct {
-	Nodes         []string `toml:"nodes"`
-	BulkSize      int      `toml:"bulk_size"`
-	FlushDuration int      `toml:"flush_duration"`
+	Nodes                []string `toml:"nodes"`
+	User                 string   `toml:"user"`
+	Passwd               string   `toml:"passwd"`
+	EnableAuthentication bool     `toml:"enable_authentication"`
+	InsecureSkipVerify   bool     `toml:"insecure_skip_verify"`
+	BulkSize             int      `toml:"bulk_size"`
+	FlushDuration        int      `toml:"flush_duration"`
 }
 type Mysql struct {
 	Addr     string `toml:"addr"`

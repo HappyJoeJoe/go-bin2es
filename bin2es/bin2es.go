@@ -4,6 +4,8 @@ import (
 	//系统
 	"context"
 	"fmt"
+	"crypto/tls"
+	"net/http"
 	"reflect"
 	"sync"
 	"time"
@@ -28,7 +30,7 @@ type Bin2es struct {
 	cancel     context.CancelFunc
 	canal      *canal.Canal
 	wg         sync.WaitGroup
-	master     *masterInfo
+	master     *dbInfo
 	esCli      *MyES
 	syncCh     chan interface{}
 	refFuncMap RefFuncMap
@@ -43,7 +45,7 @@ func NewBin2es(c *Config) (*Bin2es, error) {
 	b := new(Bin2es)
 	b.c = c
 	b.finish = make(chan bool)
-	b.syncCh = make(chan interface{}, 4096)
+	b.syncCh = make(chan interface{}, c.Bin2Es.SyncChLen)
 	b.sqlPool = make(SQLPool)
 	b.tblFilter = make(Set)
 	b.refFuncMap = make(RefFuncMap)
@@ -145,9 +147,9 @@ func (b *Bin2es) initBin2esConf() error {
 		user := b.c.Mysql.User
 		pwd := b.c.Mysql.Pwd
 		addr := b.c.Mysql.Addr
-		port := toString(b.c.Mysql.Port)
+		port := b.c.Mysql.Port
 		charset := b.c.Mysql.Charset
-		dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=%s", user, pwd, addr, port, schema, charset)
+		dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=%s", user, pwd, addr, port, schema, charset)
 
 		db, err := sql.Open("mysql", dsn)
 		if err != nil {
@@ -166,11 +168,11 @@ func (b *Bin2es) initBin2esConf() error {
 	}
 
 	//initialize refFuncMap
-	Value := reflect.ValueOf(reflectFunc{b})
-	Type := Value.Type()
-	for i := 0; i < Value.NumMethod(); i++ {
-		key := Type.Method(i)
-		b.refFuncMap[key.Name] = Value.Method(i)
+	value := reflect.ValueOf(reflectFunc{b})
+	vType := value.Type()
+	for i := 0; i < value.NumMethod(); i++ {
+		key := vType.Method(i)
+		b.refFuncMap[key.Name] = value.Method(i)
 	}
 
 	return nil
@@ -179,21 +181,38 @@ func (b *Bin2es) initBin2esConf() error {
 func (b *Bin2es) newES() error {
 	var err error
 	b.esCli = new(MyES)
-	b.esCli.Ctx = b.Ctx()
-	b.esCli.Client, err = es7.NewClient(
-		es7.SetURL(b.c.Es.Nodes...),
-		es7.SetHealthcheckInterval(5*time.Second),
-		es7.SetGzip(true),
-		es7.SetRetrier(NewMyRetrier()),
-		es7.SetSniff(false),
-	)
+	b.esCli.ctx = b.Ctx()
+
+	httpClient := http.DefaultClient
+
+	var funcs []es7.ClientOptionFunc
+	funcs = append(funcs, es7.SetURL(b.c.Es.Nodes...))
+	funcs = append(funcs, es7.SetHealthcheckInterval(5*time.Second))
+	funcs = append(funcs, es7.SetGzip(true))
+	funcs = append(funcs, es7.SetRetrier(NewMyRetrier()))
+	funcs = append(funcs, es7.SetSniff(false))
+	
+	if b.c.Es.EnableAuthentication {
+		httpClient = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: b.c.Es.InsecureSkipVerify},
+			},
+		}
+
+		funcs = append(funcs, es7.SetBasicAuth(b.c.Es.User, b.c.Es.Passwd),)
+	}
+
+	funcs = append(funcs, es7.SetHttpClient(httpClient))
+
+	b.esCli.client, err = es7.NewClient(funcs...)
+
 	if err != nil {
 		log.Errorf("Failed to create ES client, err:%s", err)
 		b.cancel()
 		return errors.Trace(err)
 	}
 
-	b.esCli.BulkService = b.esCli.Client.Bulk()
+	b.esCli.bulkService = b.esCli.client.Bulk()
 
 	log.Infof("connect to es successfully, addr:%s", b.c.Es.Nodes)
 

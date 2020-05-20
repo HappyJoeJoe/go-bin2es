@@ -12,28 +12,28 @@ import (
 	"github.com/siddontang/go-log/log"
 )
 
-type masterInfo struct {
+type dbInfo struct {
 	sync.RWMutex
 
-	DB       *sql.DB
-	ServerID uint32
-	Schema   string
-	Table    string
-	Name     string
-	Pos      uint32
+	db       *sql.DB
+	serverId uint32
+	schema   string
+	table    string
+	name     string
+	pos      uint32
 }
 
-func loadMasterInfo(server_id uint32, master_info MasterInfo) (*masterInfo, error) {
-	var m masterInfo
+func loadMasterInfo(serverId uint32, masterInfo MasterInfo) (*dbInfo, error) {
+	var m dbInfo
 
-	user := master_info.User
-	pwd := master_info.Pwd
-	addr := master_info.Addr
-	port := toString(master_info.Port)
-	schema := master_info.Schema
-	table := master_info.Table
-	charset := master_info.Charset
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/?charset=%s", user, pwd, addr, port, charset)
+	user := masterInfo.User
+	pwd := masterInfo.Pwd
+	addr := masterInfo.Addr
+	port := masterInfo.Port
+	schema := masterInfo.Schema
+	table := masterInfo.Table
+	charset := masterInfo.Charset
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/?charset=%s", user, pwd, addr, port, charset)
 
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
@@ -67,9 +67,9 @@ func loadMasterInfo(server_id uint32, master_info MasterInfo) (*masterInfo, erro
 	}
 
 	//读取master_info的`bin_name` `bin_pos`
-	var Name string
-	var Pos uint32
-	querySQL := fmt.Sprintf("SELECT bin_name, bin_pos FROM %s.%s WHERE server_id = %d", schema, table, server_id)
+	var name string
+	var pos uint32
+	querySQL := fmt.Sprintf("SELECT bin_name, bin_pos FROM %s.%s WHERE server_id = %d", schema, table, serverId)
 	rows, err := db.Query(querySQL)
 	if err != nil {
 		log.Errorf("query %s.%s failed, err:%s", schema, table, err)
@@ -77,15 +77,15 @@ func loadMasterInfo(server_id uint32, master_info MasterInfo) (*masterInfo, erro
 	}
 	defer rows.Close()
 
-	var Num = 0
+	var num = 0
 	for rows.Next() {
-		Num += 1
-		err = rows.Scan(&Name, &Pos)
+		num += 1
+		err = rows.Scan(&name, &pos)
 		if err != nil {
 			log.Errorf("iteration %s.%s failed, err:%s", schema, table, err)
 			return nil, errors.Trace(err)
 		}
-		log.Infof("bin_name:%s bin_pos:%d", Name, Pos)
+		log.Infof("bin_name:%s bin_pos:%d", name, pos)
 	}
 	err = rows.Err()
 	if err != nil {
@@ -93,8 +93,8 @@ func loadMasterInfo(server_id uint32, master_info MasterInfo) (*masterInfo, erro
 		return nil, errors.Trace(err)
 	}
 
-	if Num == 0 {
-		insertSQL := fmt.Sprintf("INSERT INTO %s.%s (server_id, bin_name, bin_pos) VALUES (%d, %s, %d)", schema, table, server_id, "''", 0)
+	if num == 0 {
+		insertSQL := fmt.Sprintf("INSERT INTO %s.%s (server_id, bin_name, bin_pos) VALUES (%d, %s, %d)", schema, table, serverId, "''", 0)
 		log.Info(insertSQL)
 		if _, err := db.Exec(insertSQL); err != nil {
 			log.Infof("insert %s.%s failed, err:%s", schema, table, err)
@@ -102,54 +102,54 @@ func loadMasterInfo(server_id uint32, master_info MasterInfo) (*masterInfo, erro
 		}
 	}
 
-	m.DB = db
-	m.Name = Name
-	m.Pos = Pos
-	m.Schema = schema
-	m.Table = table
-	m.ServerID = server_id
+	m.db = db
+	m.name = name
+	m.pos = pos
+	m.schema = schema
+	m.table = table
+	m.serverId = serverId
 
 	return &m, errors.Trace(err)
 }
 
-func (m *masterInfo) Save(pos mysql.Position) error {
+func (m *dbInfo) Save(pos mysql.Position) error {
 	log.Infof("save position %s", pos)
 
 	m.Lock()
 	defer m.Unlock()
 
-	m.Name = pos.Name
-	m.Pos = pos.Pos
+	m.name = pos.Name
+	m.pos = pos.Pos
 
 	//写db
 	var err error
-	updateSQL := fmt.Sprintf("UPDATE %s.%s SET bin_name = '%s', bin_pos = %d WHERE server_id = %d", m.Schema, m.Table, m.Name, m.Pos, m.ServerID)
-	if _, err = m.DB.Exec(updateSQL); err != nil {
-		log.Errorf("update %s.%s failed, err:%s", m.Schema, m.Table, err)
+	updateSQL := fmt.Sprintf("UPDATE %s.%s SET bin_name = '%s', bin_pos = %d WHERE server_id = %d", m.schema, m.table, m.name, m.pos, m.serverId)
+	if _, err = m.db.Exec(updateSQL); err != nil {
+		log.Errorf("update %s.%s failed, err:%s", m.schema, m.table, err)
 	}
 
 	return errors.Trace(err)
 }
 
-func (m *masterInfo) Position() mysql.Position {
+func (m *dbInfo) Position() mysql.Position {
 	m.RLock()
 	defer m.RUnlock()
 
 	return mysql.Position{
-		Name: m.Name,
-		Pos:  m.Pos,
+		Name: m.name,
+		Pos:  m.pos,
 	}
 }
 
-func (m *masterInfo) SetPosition(p mysql.Position) {
+func (m *dbInfo) SetPosition(p mysql.Position) {
 	m.RLock()
 	defer m.RUnlock()
 
-	m.Name = p.Name
-	m.Pos = p.Pos
+	m.name = p.Name
+	m.pos = p.Pos
 }
 
-func (m *masterInfo) Close() error {
+func (m *dbInfo) Close() error {
 	log.Info("----- closing master -----")
 
 	pos := m.Position()

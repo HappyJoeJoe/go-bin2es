@@ -157,15 +157,15 @@ func (b *Bin2es) syncES() {
 				return
 			}
 
-			if b.esCli.BulkService.NumberOfActions() >= b.c.Es.BulkSize {
+			if b.esCli.bulkService.NumberOfActions() >= b.c.Es.BulkSize {
 				needFlush = true
 			}
 		}
 
-		if needFlush && b.esCli.BulkService.NumberOfActions() > 0 {
-			bulkResponse, err := b.esCli.BulkService.Do(context.TODO())
+		if needFlush && b.esCli.bulkService.NumberOfActions() > 0 {
+			bulkResponse, err := b.esCli.bulkService.Do(context.TODO())
 			if err != nil {
-				log.Errorf("BulkService Do failed, err:%+v", err)
+				log.Errorf("bulkService Do failed, err:%+v", err)
 				b.cancel()
 				return
 			}
@@ -198,61 +198,61 @@ func (b *Bin2es) syncES() {
 	return
 }
 
-func (b *Bin2es) Pipeline(row map[string]interface{}) error {
+func (b *Bin2es) Pipeline(binRow map[string]interface{}) error {
 
-	schema := row["schema"].(string)
-	table := row["table"].(string)
-	action := row["action"].(string)
+	schema := binRow["schema"].(string)
+	table := binRow["table"].(string)
+	action := binRow["action"].(string)
 
 	confs := b.event2Pipe[fmt.Sprintf("%s_%s_%s", schema, table, action)]
 	for _, conf := range confs {
 
-		Rows := []map[string]interface{}{row}
+		rows := []map[string]interface{}{binRow}
 
-		for _, Pipeline := range conf.Pipelines {
-			for funcName, funcArgs := range Pipeline {
+		for _, pipeline := range conf.Pipelines {
+			for funcName, funcArgs := range pipeline {
 
-				TmpRows := make([]map[string]interface{}, 0)
+				tmpRows := make([]map[string]interface{}, 0)
 
-				for _, Row := range Rows {
+				for _, row := range rows {
 
-					Args := []reflect.Value{reflect.ValueOf(Row), reflect.ValueOf(funcArgs.(map[string]interface{}))}
+					args := []reflect.Value{reflect.ValueOf(row), reflect.ValueOf(funcArgs.(map[string]interface{}))}
 
-					RetValues := b.refFuncMap[funcName].Call(Args)
+					retValues := b.refFuncMap[funcName].Call(args)
 
-					if !RetValues[1].IsNil() {
-						if err := RetValues[1].Interface().(error); err != nil {
+					if !retValues[1].IsNil() {
+						if err := retValues[1].Interface().(error); err != nil {
 							return errors.Trace(err)
 						}
 					}
 
-					if RetValues[0].IsNil() || !RetValues[0].CanInterface() {
-						return errors.Errorf("Pipeline:%s RetValues:%+v exception, Row:%+v funcArgs:%+v", funcName, RetValues[0], Row, funcArgs)
+					if retValues[0].IsNil() || !retValues[0].CanInterface() {
+						return errors.Errorf("pipeline:%s retValues:%+v exception, row:%+v funcArgs:%+v", funcName, retValues[0], row, funcArgs)
 					}
-					NewRows := RetValues[0].Interface().(ROWS)
-					if len(NewRows) == 0 {
-						log.Warnf("Pipeline:%s get null result, Row:%+v funcArgs:%+v", funcName, Row, funcArgs)
+					newRows := retValues[0].Interface().(ROWS)
+					if len(newRows) == 0 {
+						// log.Warnf("pipeline:%s get null result, row:%+v funcArgs:%+v", funcName, row, funcArgs)
 						return nil
 					}
-					TmpRows = append(TmpRows, NewRows...)
+					tmpRows = append(tmpRows, newRows...)
 				}
 
-				Rows = TmpRows
+				rows = tmpRows
 			}
 		}
 
 		var request es7.BulkableRequest
-		for _, row := range Rows {
-			doc_id := row["_id"].(string)
-			delete(row, "_id")
+		for _, esRow := range rows {
+			docId := esRow["_id"].(string)
+			delete(esRow, "_id")
 
 			switch action {
 			case "insert":
-				request = es7.NewBulkIndexRequest().Index(conf.Dest.Index).Id(doc_id).Doc(row)
+				request = es7.NewBulkIndexRequest().Index(conf.Dest.Index).Id(docId).Doc(esRow)
 			case "update":
-				request = es7.NewBulkUpdateRequest().Index(conf.Dest.Index).Id(doc_id).Doc(row).DocAsUpsert(true)
+				request = es7.NewBulkUpdateRequest().Index(conf.Dest.Index).Id(docId).Doc(esRow).DocAsUpsert(true)
 			}
-			b.esCli.BulkService.Add(request).Refresh("true")
+			b.esCli.bulkService.Add(request).Refresh("true")
 		}
 	}
 

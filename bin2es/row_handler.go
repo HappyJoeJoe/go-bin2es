@@ -37,29 +37,16 @@ func (r reflectFunc) DoSQL(row map[string]interface{}, funcArgs map[string]inter
 	placeHolders := funcArgs["placeholders"].(map[string]interface{})
 	key := placeHolders[table].(string)
 
-	detectSQL := fmt.Sprintf("SELECT %s FROM %s.%s WHERE %s = %s LOCK IN SHARE MODE", key, schema, table, key, body[key])
-	detect_rows, err := db.Query(detectSQL)
-	if err != nil {
-		log.Errorf("detectSQL:[%s] execute failed, err:%s", detectSQL, errors.Trace(err))
-		return nil, errors.Trace(err)
-	}
-	defer detect_rows.Close()
-	err = detect_rows.Err()
-	if err != nil {
-		log.Errorf("detect Err:%s", errors.Trace(err))
-		return nil, errors.Trace(err)
-	}
-
 	placeHolderStr := fmt.Sprintf("%s.%s = %s", table, key, body[key])
 	querySQL = strings.Replace(querySQL, "?", placeHolderStr, -1)
-	es_rows, err := db.Query(querySQL)
+	esRows, err := db.Query(querySQL)
 	if err != nil {
 		log.Errorf("querySQL:[%s] execute failed, err:%s", querySQL, errors.Trace(err))
 		return nil, errors.Trace(err)
 	}
-	defer es_rows.Close()
+	defer esRows.Close()
 
-	columns, err := es_rows.Columns()
+	columns, err := esRows.Columns()
 	if err != nil {
 		log.Errorf("get columns failed, err:%s", errors.Trace(err))
 		return nil, errors.Trace(err)
@@ -71,24 +58,26 @@ func (r reflectFunc) DoSQL(row map[string]interface{}, funcArgs map[string]inter
 		scanArgs[i] = &values[i]
 	}
 
-	for es_rows.Next() {
+	for esRows.Next() {
 		// get RawBytes from data
-		err = es_rows.Scan(scanArgs...)
+		err = esRows.Scan(scanArgs...)
 		if err != nil {
 			log.Errorf("scan failed, err:%s", errors.Trace(err))
 			return nil, errors.Trace(err)
 		}
 
-		row_ := make(map[string]interface{})
+		esRow := make(map[string]interface{})
 		for i, col := range values {
 			//此时行数据该字段如果为`null`则忽略
 			if col != nil {
-				row_[columns[i]] = string(col)
+				esRow[columns[i]] = string(col)
 			}
 		}
-		rows = append(rows, row_)
+
+		rows = append(rows, esRow)
 	}
-	if err = es_rows.Err(); err != nil {
+
+	if err = esRows.Err(); err != nil {
 		log.Errorf("query Err:%s", errors.Trace(err))
 		return nil, errors.Trace(err)
 	}
@@ -97,49 +86,49 @@ func (r reflectFunc) DoSQL(row map[string]interface{}, funcArgs map[string]inter
 }
 
 /* fuction: 处理对象类型
- * Common 表示最终映射到es上的object名字
- * Fields 表示sql映射到es上的[键:值]对
+ * common 表示最终映射到es上的object名字
+ * fields 表示sql映射到es上的[键:值]对
  */
 func (r reflectFunc) Object(row map[string]interface{}, funcArgs map[string]interface{}) (ROWS, error) {
 	rows := make(ROWS, 0)
 
 	//参数
-	Common := funcArgs["common"].(string)
-	Fields := funcArgs["fields"].([]interface{})
+	common := funcArgs["common"].(string)
+	fields := funcArgs["fields"].([]interface{})
 
 	//参数校验
-	if Common == "" || Fields == nil || len(Fields) == 0 {
-		return nil, errors.Errorf("Params invalid, Common:%+v Fields:%+v", Common, Fields)
+	if common == "" || fields == nil || len(fields) == 0 {
+		return nil, errors.Errorf("params invalid, common:%+v fields:%+v", common, fields)
 	}
 
-	common := make(map[string]interface{})
-	for _, MapField := range Fields {
-		for SQLName, ESName := range MapField.(map[string]interface{}) {
-			if SQLName == "" || ESName == nil || ESName.(string) == "" {
-				return nil, errors.Errorf("Fields invalid, Fields:%+v", Fields)
+	object := make(map[string]interface{})
+	for _, mapField := range fields {
+		for sqlName, esName := range mapField.(map[string]interface{}) {
+			if sqlName == "" || esName == nil || esName.(string) == "" {
+				return nil, errors.Errorf("fields invalid, fields:%+v", fields)
 			}
-			//此时不用强行要求`row[SQLName]`不得为空字符串, 给业务层面预留更大的空间
-			if row[SQLName] != nil /* && row[SQLName].(string) != "" */ {
-				common[ESName.(string)] = row[SQLName]
+			//此时不用强行要求`row[sqlName]`不得为空字符串, 给业务层面预留更大的空间
+			if row[sqlName] != nil /* && row[SQLName].(string) != "" */ {
+				object[esName.(string)] = row[sqlName]
 			}
-			delete(row, SQLName)
+			delete(row, sqlName)
 		}
 	}
 
-	row[Common] = common
+	row[common] = object
 	rows = append(rows, row)
 
 	return rows, nil
 }
 
 /* fuction: 处理嵌套数组
- * SQLField 表示要解析的sql字段
- * Common 表示最终映射到es上的object名字
- * Pos2Fields 表示最终映射到es上的[键:值]对
+ * sqlField 表示要解析的sql字段
+ * common 表示最终映射到es上的object名字
+ * pos2Fields 表示最终映射到es上的[键:值]对
  *     键: 表示es上的数组对象的key
- *     值: 表示行记录的`SQLField`字段被','解析的字符串数组的每个值, 该值又继续被'_'解析的字符串数组的对应的索引
- * FieldsSeprator 表示被连接字段之间的分隔符
- * GroupSeprator  表示组分隔符
+ *     值: 表示行记录的`sqlField`字段被','解析的字符串数组的每个值, 该值又继续被'_'解析的字符串数组的对应的索引
+ * fieldsSeprator 表示被连接字段之间的分隔符
+ * groupSeprator  表示组分隔符
  * eg: '68_3,94_3,94_3'
  *     被解析为: [[68, 3], [94, 3], [94, 3]]
  *     其中`68`对应的位置是`1`, 而`3`对应的位置是`2`
@@ -148,67 +137,66 @@ func (r reflectFunc) NestedArray(row map[string]interface{}, funcArgs map[string
 	rows := make(ROWS, 0)
 
 	//参数
-	SQLField := funcArgs["sql_field"].(string)
-	Common := funcArgs["common"].(string)
-	Pos2Fields := funcArgs["pos2fields"].([]interface{})
-	GroupSeprator := funcArgs["group_seprator"].(string)
-	FieldsSeprator := funcArgs["fields_seprator"].(string)
+	sqlField := funcArgs["sql_field"].(string)
+	common := funcArgs["common"].(string)
+	pos2Fields := funcArgs["pos2fields"].([]interface{})
+	groupSeprator := funcArgs["group_seprator"].(string)
+	fieldsSeprator := funcArgs["fields_seprator"].(string)
 
 	//参数校验
-	if SQLField == "" || Common == "" || Pos2Fields == nil || len(Pos2Fields) == 0 || FieldsSeprator == "" || GroupSeprator == "" {
-		rows = append(rows, row)
-		return nil, errors.Errorf("Params invalid, SQLField:%+v Common:%+v Pos2Fields:%+v FieldsSeprator:%+v GroupSeprator:%+v row:%+v", SQLField, Common, Pos2Fields, FieldsSeprator, GroupSeprator, row)
+	if sqlField == "" || common == "" || pos2Fields == nil || len(pos2Fields) == 0 || fieldsSeprator == "" || groupSeprator == "" {
+		return nil, errors.Errorf("Params invalid, sqlField:%+v common:%+v pos2Fields:%+v fieldsSeprator:%+v groupSeprator:%+v row:%+v", sqlField, common, pos2Fields, fieldsSeprator, groupSeprator, row)
 	}
 
-	if row[SQLField] == nil || row[SQLField].(string) == "" {
-		delete(row, SQLField)
+	if row[sqlField] == nil || row[sqlField].(string) == "" {
+		delete(row, sqlField)
 		rows = append(rows, row)
 		return rows, nil
 	}
 
-	toSplitFields := strings.Split(row[SQLField].(string), GroupSeprator)
+	toSplitFields := strings.Split(row[sqlField].(string), groupSeprator)
 
 	resFields := make([][]string, 0)
 	for _, field := range toSplitFields {
-		res := strings.Split(field, FieldsSeprator)
+		res := strings.Split(field, fieldsSeprator)
 		resFields = append(resFields, res)
 	}
 
-	common := make([]map[string]string, 0)
+	objList := make([]map[string]string, 0)
 	for _, res := range resFields {
 		obj := make(map[string]string)
-		for _, MapField := range Pos2Fields {
-			for ESName, SQLPos := range MapField.(map[string]interface{}) {
-				if ESName == "" || SQLPos == nil || uint64(SQLPos.(float64)) == 0 {
+		for _, mapField := range pos2Fields {
+			for esName, sqlPos := range mapField.(map[string]interface{}) {
+				if esName == "" || sqlPos == nil || uint64(sqlPos.(float64)) == 0 {
 					return nil, errors.Errorf("resFields invalid, resFields:%+v", resFields)
 				}
-				obj[ESName] = res[uint64(SQLPos.(float64))-1]
+				obj[esName] = res[uint64(sqlPos.(float64))-1]
 			}
 		}
-		common = append(common, obj)
+		objList = append(objList, obj)
 	}
 
-	delete(row, SQLField)
-	row[Common] = common
+	delete(row, sqlField)
+	row[common] = objList
 	rows = append(rows, row)
 
 	return rows, nil
 }
 
 /* fuction: 用于设置elasticsearch的文档ID
- * DocID 表示行数据里用于设置文档ID的字段
+ * docID 表示行数据里用于设置文档ID的字段
  */
 func (r reflectFunc) SetDocID(row map[string]interface{}, funcArgs map[string]interface{}) (ROWS, error) {
 	rows := make(ROWS, 0)
 
 	//参数
-	DocID := funcArgs["doc_id"].(string)
+	docID := funcArgs["doc_id"].(string)
 	//参数校验
-	if DocID == "" || DocID == "_id" || row[DocID] == nil || row[DocID] == "" || row["_id"] != nil {
-		return nil, errors.Errorf("DocID invalid, DocID:%+v row:%+v", DocID, row)
+	if docID == "" || docID == "_id" || row[docID] == nil || row[docID] == "" || row["_id"] != nil {
+		return nil, errors.Errorf("docID invalid, docID:%+v row:%+v", docID, row)
 	}
 
-	row["_id"] = row[DocID].(string)
+	row["_id"] = row[docID].(string)
 
 	rows = append(rows, row)
 

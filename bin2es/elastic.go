@@ -13,9 +13,9 @@ import (
 )
 
 type MyES struct {
-	Client      *es7.Client
-	BulkService *es7.BulkService
-	Ctx         context.Context
+	client      *es7.Client
+	bulkService *es7.BulkService
+	ctx         context.Context
 }
 
 type MyRetrier struct {
@@ -29,12 +29,12 @@ func NewMyRetrier() *MyRetrier {
 }
 
 func (r *MyRetrier) Retry(ctx context.Context, retry int, req *http.Request, resp *http.Response, err error) (time.Duration, bool, error) {
-	// Fail hard on a specific error
+	// 在一个特定的error上退出
 	if err == syscall.ECONNREFUSED {
 		return 0, false, errors.New("Elasticsearch or network down")
 	}
 
-	// Let the backoff strategy decide how long to wait and whether to stop
+	// 让 backoff 策略决定等待多久, 何时停止
 	wait, stop := r.backoff.Next(retry)
 
 	log.Infof("request es failed, retrying wait:%d  stop:%t", wait, stop)
@@ -45,5 +45,5 @@ func (r *MyRetrier) Retry(ctx context.Context, retry int, req *http.Request, res
 func (e *MyES) Close() {
 	defer log.Info("----- ES closed -----")
 
-	e.Client.Stop()
+	e.client.Stop()
 }

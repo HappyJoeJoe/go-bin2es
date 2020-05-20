@@ -1,7 +1,14 @@
+[bin2es]
+sync_ch_len = 64
+
 [es]
 nodes = [
 	"http://localhost:9200" #es集群
 ]
+user = "elastic"
+passwd = "123456"
+enable_authentication = false
+insecure_skip_verify = true
 bulk_size = 1024  #批量刷新个数
 flush_duration = 500  #批量刷新时间间隔, 单位:ms
 
@@ -32,7 +39,7 @@ hosts = [
 ]
 
 [etcd]
-enable = true
+enable = false
 enable_tls = true
 lock_path = "/go-bin2es-lock"
 dial_timeout = 3

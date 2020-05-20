@@ -56,11 +56,17 @@ insert into Child (name, sex, parent_id) values ('Jerry2', 'f', 2); -- Jerry's c
 ### editing your config.toml, and configure it like following:
 
 ```toml
+[bin2es]
+sync_ch_len = 64
 
 [es]
 nodes = [
     "http://localhost:9200" #es集群
 ]
+user = "elastic"
+passwd = "123456"
+enable_authentication = false #开启认证
+insecure_skip_verify = true #是否忽略证书校验
 bulk_size = 1024  #批量刷新个数
 flush_duration = 500  #批量刷新时间间隔, 单位:ms
 
