@@ -94,7 +94,7 @@ func (r reflectFunc) Object(row map[string]interface{}, funcArgs map[string]inte
 
 	//参数
 	common := funcArgs["common"].(string)
-	fields := funcArgs["fields"].([]interface{})
+	fields := funcArgs["fields"].(map[string]interface{})
 
 	//参数校验
 	if common == "" || fields == nil || len(fields) == 0 {
@@ -102,17 +102,15 @@ func (r reflectFunc) Object(row map[string]interface{}, funcArgs map[string]inte
 	}
 
 	object := make(map[string]interface{})
-	for _, mapField := range fields {
-		for sqlName, esName := range mapField.(map[string]interface{}) {
-			if sqlName == "" || esName == nil || esName.(string) == "" {
-				return nil, errors.Errorf("fields invalid, fields:%+v", fields)
-			}
-			//此时不用强行要求`row[sqlName]`不得为空字符串, 给业务层面预留更大的空间
-			if row[sqlName] != nil /* && row[SQLName].(string) != "" */ {
-				object[esName.(string)] = row[sqlName]
-			}
-			delete(row, sqlName)
+	for sqlName, esName := range fields {
+		if sqlName == "" || esName == nil || esName.(string) == "" {
+			return nil, errors.Errorf("fields invalid, fields:%+v", fields)
 		}
+		//此时不用强行要求`row[sqlName]`不得为空字符串, 给业务层面预留更大的空间
+		if row[sqlName] != nil /* && row[SQLName].(string) != "" */ {
+			object[esName.(string)] = row[sqlName]
+		}
+		delete(row, sqlName)
 	}
 
 	row[common] = object
@@ -139,7 +137,7 @@ func (r reflectFunc) NestedArray(row map[string]interface{}, funcArgs map[string
 	//参数
 	sqlField := funcArgs["sql_field"].(string)
 	common := funcArgs["common"].(string)
-	pos2Fields := funcArgs["pos2fields"].([]interface{})
+	pos2Fields := funcArgs["pos2fields"].(map[string]interface{})
 	groupSeprator := funcArgs["group_seprator"].(string)
 	fieldsSeprator := funcArgs["fields_seprator"].(string)
 
@@ -165,13 +163,11 @@ func (r reflectFunc) NestedArray(row map[string]interface{}, funcArgs map[string
 	objList := make([]map[string]string, 0)
 	for _, res := range resFields {
 		obj := make(map[string]string)
-		for _, mapField := range pos2Fields {
-			for esName, sqlPos := range mapField.(map[string]interface{}) {
-				if esName == "" || sqlPos == nil || uint64(sqlPos.(float64)) == 0 {
-					return nil, errors.Errorf("resFields invalid, resFields:%+v", resFields)
-				}
-				obj[esName] = res[uint64(sqlPos.(float64))-1]
+		for esName, sqlPos := range pos2Fields {
+			if esName == "" || sqlPos == nil || uint64(sqlPos.(float64)) == 0 {
+				return nil, errors.Errorf("resFields invalid, resFields:%+v", resFields)
 			}
+			obj[esName] = res[uint64(sqlPos.(float64))-1]
 		}
 		objList = append(objList, obj)
 	}
