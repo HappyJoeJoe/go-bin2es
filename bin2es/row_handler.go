@@ -101,11 +101,14 @@ func (r reflectFunc) Object(row map[string]interface{}, funcArgs map[string]inte
 		return nil, errors.Errorf("params invalid, common:%+v fields:%+v", common, fields)
 	}
 
-	object := make(map[string]interface{})
 	for sqlName, esName := range fields {
 		if sqlName == "" || esName == nil || esName.(string) == "" {
 			return nil, errors.Errorf("fields invalid, fields:%+v", fields)
 		}
+	}
+
+	object := make(map[string]interface{})
+	for sqlName, esName := range fields {
 		//此时不用强行要求`row[sqlName]`不得为空字符串, 给业务层面预留更大的空间
 		if row[sqlName] != nil /* && row[SQLName].(string) != "" */ {
 			object[esName.(string)] = row[sqlName]
@@ -152,22 +155,21 @@ func (r reflectFunc) NestedArray(row map[string]interface{}, funcArgs map[string
 		return rows, nil
 	}
 
-	toSplitFields := strings.Split(row[sqlField].(string), groupSeprator)
-
-	resFields := make([][]string, 0)
-	for _, field := range toSplitFields {
-		res := strings.Split(field, fieldsSeprator)
-		resFields = append(resFields, res)
+	pos2FieldMap := make(map[string]uint64)
+	for esName, sqlPos := range pos2Fields {
+		if esName == "" || sqlPos == nil || uint64(sqlPos.(float64)) == 0 {
+			return nil, errors.Errorf("pos2Fields invalid, pos2Fields:%+v", pos2Fields)
+		}
+		pos2FieldMap[esName] = uint64(sqlPos.(float64)) - 1
 	}
 
 	objList := make([]map[string]string, 0)
-	for _, res := range resFields {
+	toSplitFields := strings.Split(row[sqlField].(string), groupSeprator)
+	for _, field := range toSplitFields {
+		res := strings.Split(field, fieldsSeprator)
 		obj := make(map[string]string)
-		for esName, sqlPos := range pos2Fields {
-			if esName == "" || sqlPos == nil || uint64(sqlPos.(float64)) == 0 {
-				return nil, errors.Errorf("resFields invalid, resFields:%+v", resFields)
-			}
-			obj[esName] = res[uint64(sqlPos.(float64))-1]
+		for esName, sqlPos := range pos2FieldMap {
+			obj[esName] = res[sqlPos]
 		}
 		objList = append(objList, obj)
 	}
