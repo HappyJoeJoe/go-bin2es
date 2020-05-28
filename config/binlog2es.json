@@ -19,20 +19,20 @@
             {
                 "Object":{
                     "common":"profile",
-                    "fields":[
-                        {"name":"es_name"},
-                        {"sex":"es_sex"}
-                    ]
+                    "fields":{
+                        "name":"es_name",
+                        "sex":"es_sex"
+                    }
                 }
             },
             {
                 "NestedArray":{
                     "sql_field":"Childs",
                     "common":"childs",
-                    "pos2fields":[
-                        {"es_name":1},
-                        {"es_sex":2}
-                    ],
+                    "pos2fields":{
+                        "es_name":1,
+                        "es_sex":2
+                    },
                     "fields_seprator": "_",
                     "group_seprator": ","
                 }

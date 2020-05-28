@@ -137,28 +137,28 @@ tables = [
                 "DoSQL":{
                     "sql":"SELECT Parent.id, Parent.name, Parent.sex, group_concat(concat_ws('_', Child.name, Child.sex) separator ',') as Childs FROM Parent join Child on Parent.id = Child.parent_id WHERE (?) GROUP BY Parent.id",
                     "placeholders":{              #若遇到Parent或Child, 自动将`?`替换为`$key.$value = {该表对应的$value对应的字段的值}`
-                        {"Parent":"id"},      #eg: 若遇到Parent, 则`?`被替换为`Parent.id = 行数据对应的`id`字段的值`
-                        {"Child":"parent_id"} #eg: 若遇到Child, 则`?`被替换为`Child.parent_id = 行数据对应的`parent_id`字段的值`
+                        "Parent":"id",      #eg: 若遇到Parent, 则`?`被替换为`Parent.id = 行数据对应的`id`字段的值`
+                        "Child":"parent_id" #eg: 若遇到Child, 则`?`被替换为`Child.parent_id = 行数据对应的`parent_id`字段的值`
                     }
                 }
             },
             {
                 "Object":{
                     "common":"profile",
-                    "fields":[
-                        {"name":"es_name"},   #将查询到的结果的`name`字段放进`profile`的`es_name`下
-                        {"sex":"es_sex"}      #同理
-                    ]
+                    "fields":{
+                        "name":"es_name",   #将查询到的结果的`name`字段放进`profile`的`es_name`下
+                        "sex":"es_sex"      #同理
+                    }
                 }
             },
             {
                 "NestedArray":{
                     "sql_field":"Childs",     #将查询到的结果的`Childs`字段解析放入到common指定的`childs`下
                     "common":"childs",
-                    "pos2fields":[            #其中解析结果的第一个位置放入到es的`es_name`下, 第二个位置放入到`es_sex`下
-                        {"es_name":1},
-                        {"es_sex":2}
-                    ],
+                    "pos2fields":{            #其中解析结果的第一个位置放入到es的`es_name`下, 第二个位置放入到`es_sex`下
+                        "es_name":1,
+                        "es_sex":2
+                    },
                     "fields_seprator": "_",
                     "group_seprator": ","
                 }
