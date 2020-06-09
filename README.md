@@ -110,6 +110,7 @@ endpoints = [
 
 [[source]]
 schema = "test"
+dump_table = "Parent"
 tables = [
     "Parent",
     "Child"
