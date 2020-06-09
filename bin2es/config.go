@@ -65,8 +65,9 @@ type Mysql struct {
 	ServerID uint32 `toml:"server_id"`
 }
 type Source struct {
-	Schema string   `toml:"schema"`
-	Tables []string `toml:"tables"`
+	Schema    string   `toml:"schema"`
+	DumpTable string   `toml:"dump_table"`
+	Tables    []string `toml:"tables"`
 }
 
 func NewConfigWithFile(path string) (*Config, error) {

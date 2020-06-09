@@ -104,7 +104,7 @@ func (b *Bin2es) newCanal() error {
 
 	//prepare canal
 	for _, source := range b.c.Sources {
-		b.canal.AddDumpTables(source.Schema, source.Tables...)
+		b.canal.AddDumpTables(source.Schema, source.DumpTable)
 	}
 
 	// We must use binlog full row image
