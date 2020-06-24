@@ -37,6 +37,19 @@ func (r reflectFunc) DoSQL(row map[string]interface{}, funcArgs map[string]inter
 	placeHolders := funcArgs["placeholders"].(map[string]interface{})
 	key := placeHolders[table].(string)
 
+	detectSQL := fmt.Sprintf("SELECT %s FROM %s.%s WHERE %s = %s LOCK IN SHARE MODE", key, schema, table, key, body[key])
+	detect_rows, err := db.Query(detectSQL)
+	if err != nil {
+		log.Errorf("detectSQL:[%s] execute failed, err:%s", detectSQL, errors.Trace(err))
+		return nil, errors.Trace(err)
+	}
+	defer detect_rows.Close()
+	err = detect_rows.Err()
+	if err != nil {
+		log.Errorf("detect Err:%s", errors.Trace(err))
+		return nil, errors.Trace(err)
+	}
+
 	placeHolderStr := fmt.Sprintf("%s.%s = %s", table, key, body[key])
 	querySQL = strings.Replace(querySQL, "?", placeHolderStr, -1)
 	esRows, err := db.Query(querySQL)
